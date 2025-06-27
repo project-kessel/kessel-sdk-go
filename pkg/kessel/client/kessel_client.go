@@ -3,10 +3,10 @@ package client
 import (
 	"context"
 
-	"github.com/project-kessel/kessel-sdk-go/_proto/kessel/inventory/v1beta2"
 	"github.com/project-kessel/kessel-sdk-go/pkg/kessel/config"
 	kesselgrpc "github.com/project-kessel/kessel-sdk-go/pkg/kessel/grpc"
 	"github.com/project-kessel/kessel-sdk-go/pkg/kessel/http"
+	v1beta2 "github.com/project-kessel/kessel-sdk-go/pkg/kessel/inventory/v1beta2"
 	grpc "google.golang.org/grpc"
 )
 

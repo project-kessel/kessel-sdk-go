@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/project-kessel/kessel-sdk-go/_proto/kessel/inventory/v1beta2"
 	kesselclient "github.com/project-kessel/kessel-sdk-go/pkg/kessel/client"
 	"github.com/project-kessel/kessel-sdk-go/pkg/kessel/config"
+	v1beta2 "github.com/project-kessel/kessel-sdk-go/pkg/kessel/inventory/v1beta2"
 )
 
 func main() {

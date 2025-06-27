@@ -4,11 +4,11 @@ import (
 	"context"
 	"log"
 
-	"github.com/project-kessel/kessel-sdk-go/_proto/kessel/inventory/v1beta2"
 	"github.com/project-kessel/kessel-sdk-go/pkg/kessel/auth"
 	"github.com/project-kessel/kessel-sdk-go/pkg/kessel/config"
 	"github.com/project-kessel/kessel-sdk-go/pkg/kessel/errors"
 	kesselgrpc "github.com/project-kessel/kessel-sdk-go/pkg/kessel/grpc"
+	v1beta2 "github.com/project-kessel/kessel-sdk-go/pkg/kessel/inventory/v1beta2"
 	grpc "google.golang.org/grpc"
 )
 

@@ -7,11 +7,11 @@ import (
 	nethttp "net/http"
 
 	khttp "github.com/go-kratos/kratos/v2/transport/http"
-	"github.com/project-kessel/kessel-sdk-go/_proto/kessel/inventory/v1beta2"
 	"github.com/project-kessel/kessel-sdk-go/pkg/kessel/auth"
 	"github.com/project-kessel/kessel-sdk-go/pkg/kessel/config"
 	"github.com/project-kessel/kessel-sdk-go/pkg/kessel/errors"
 	"github.com/project-kessel/kessel-sdk-go/pkg/kessel/http"
+	v1beta2 "github.com/project-kessel/kessel-sdk-go/pkg/kessel/inventory/v1beta2"
 	"google.golang.org/grpc"
 )
 
