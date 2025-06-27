@@ -78,7 +78,7 @@ func (a *TokenClient) GetCachedToken(tokenKey string) (string, error) {
 	if isCached {
 		return ct, nil
 	}
-	return "", fmt.Errorf("failed to retrieve cached token")
+	return "", errors.NewTokenCacheError("failed to retrieve cached token")
 }
 
 func IsJWTTokenExpired(accessToken string) (bool, time.Time) {
@@ -123,7 +123,7 @@ func (a *TokenClient) GetToken() (*TokenResponse, error) {
 	defer func(Body io.ReadCloser) {
 		err = Body.Close()
 		if err != nil {
-			log.Printf("error: %v", errors.Wrap(err, "failed to close the connection"))
+			log.Printf("error: %v", errors.NewResourceCloseError(err, "failed to close the connection"))
 		}
 	}(resp.Body)
 
@@ -133,7 +133,7 @@ func (a *TokenClient) GetToken() (*TokenResponse, error) {
 	}
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("unexpected status code: %d", resp.StatusCode)
+		return nil, errors.NewStatusError(resp.StatusCode, "unexpected status code")
 	}
 
 	var tokenResponse TokenResponse

@@ -39,7 +39,7 @@ func (h HTTPClient) getTokenHTTPOption() ([]khttp.CallOption, error) {
 func (h HTTPClient) Check(ctx context.Context, in *v1beta2.CheckRequest) (*v1beta2.CheckResponse, error) {
 	opts, err := h.getTokenHTTPOption()
 	if err != nil {
-		log.Printf("error: %v", errors.Wrap(err, "failed to get token"))
+		log.Printf("error: %v", errors.NewTokenError(err, "failed to get token"))
 	}
 
 	return h.inventoryServiceHTTPClient.Check(ctx, in, opts...)
@@ -48,7 +48,7 @@ func (h HTTPClient) Check(ctx context.Context, in *v1beta2.CheckRequest) (*v1bet
 func (h HTTPClient) CheckForUpdate(ctx context.Context, in *v1beta2.CheckForUpdateRequest) (*v1beta2.CheckForUpdateResponse, error) {
 	opts, err := h.getTokenHTTPOption()
 	if err != nil {
-		log.Printf("error: %v", errors.Wrap(err, "failed to get token"))
+		log.Printf("error: %v", errors.NewTokenError(err, "failed to get token"))
 	}
 	return h.inventoryServiceHTTPClient.CheckForUpdate(ctx, in, opts...)
 }
@@ -56,10 +56,7 @@ func (h HTTPClient) CheckForUpdate(ctx context.Context, in *v1beta2.CheckForUpda
 func (h HTTPClient) ReportResource(ctx context.Context, in *v1beta2.ReportResourceRequest) (*v1beta2.ReportResourceResponse, error) {
 	opts, err := h.getTokenHTTPOption()
 	if err != nil {
-		err := errors.Wrap(err, "failed to get token")
-		if err != nil {
-			return nil, err
-		}
+		log.Printf("error: %v", errors.NewTokenError(err, "failed to get token"))
 	}
 	return h.inventoryServiceHTTPClient.ReportResource(ctx, in, opts...)
 }
@@ -67,7 +64,7 @@ func (h HTTPClient) ReportResource(ctx context.Context, in *v1beta2.ReportResour
 func (h HTTPClient) DeleteResource(ctx context.Context, in *v1beta2.DeleteResourceRequest) (*v1beta2.DeleteResourceResponse, error) {
 	opts, err := h.getTokenHTTPOption()
 	if err != nil {
-		log.Printf("error: %v", errors.Wrap(err, "failed to get token"))
+		log.Printf("error: %v", errors.NewTokenError(err, "failed to get token"))
 	}
 	return h.inventoryServiceHTTPClient.DeleteResource(ctx, in, opts...)
 }

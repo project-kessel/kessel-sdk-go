@@ -74,7 +74,7 @@ func (b *ClientBuilder) Build(ctx context.Context) (*http.Client, error) {
 
 	cli, err := http.NewClient(ctx, opts...)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create HTTP client")
+		return nil, errors.NewHTTPClientError(err, "failed to create HTTP client")
 	}
 
 	return cli, nil
