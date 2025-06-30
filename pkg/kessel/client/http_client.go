@@ -18,16 +18,16 @@ import (
 type HTTPClient struct {
 	client                     *khttp.Client
 	inventoryServiceHTTPClient v1beta2.KesselInventoryServiceHTTPClient
-	tokenClient                *auth.TokenClient
-	config                     *config.Config
+	tokenSource                *auth.TokenSource
+	config                     *config.HTTPConfig
 }
 
 func (h HTTPClient) getTokenHTTPOption() ([]khttp.CallOption, error) {
 	var opts []khttp.CallOption
-	if h.config.EnableOIDCAuth {
-		token, err := h.tokenClient.GetToken()
+	if h.config.EnableOauth && h.tokenSource != nil {
+		token, err := h.tokenSource.GetToken(context.Background())
 		if err != nil {
-			return nil, err
+			return nil, errors.NewTokenError(err, "failed to get OAuth2 token")
 		}
 		header := nethttp.Header{}
 		header.Set("Authorization", fmt.Sprintf("Bearer %s", token.AccessToken))
@@ -41,7 +41,6 @@ func (h HTTPClient) Check(ctx context.Context, in *v1beta2.CheckRequest) (*v1bet
 	if err != nil {
 		log.Printf("error: %v", errors.NewTokenError(err, "failed to get token"))
 	}
-
 	return h.inventoryServiceHTTPClient.Check(ctx, in, opts...)
 }
 
@@ -77,20 +76,25 @@ func (h HTTPClient) Close() error {
 	return h.client.Close()
 }
 
-func NewHTTPClient(ctx context.Context, cfg *config.Config, builder *http.ClientBuilder) (*HTTPClient, error) {
+// NewHTTPClient creates a new HTTP client for the Kessel inventory service
+func NewHTTPClient(ctx context.Context, cfg *config.HTTPConfig, builder *http.ClientBuilder) (*HTTPClient, error) {
 	client, err := builder.Build(ctx)
 	if err != nil {
-		return nil, err
+		return nil, errors.NewHTTPClientError(err, "failed to create HTTP client")
 	}
-	var tokenClient *auth.TokenClient
-	if cfg.EnableOIDCAuth {
-		tokenClient = auth.NewTokenClient(cfg)
+
+	var tokenSource *auth.TokenSource
+	if cfg.EnableOauth {
+		tokenSource, err = auth.NewTokenSource(cfg)
+		if err != nil {
+			return nil, errors.NewTokenError(err, "failed to create OAuth2 token source")
+		}
 	}
 
 	return &HTTPClient{
 		config:                     cfg,
 		client:                     client,
-		tokenClient:                tokenClient,
+		tokenSource:                tokenSource,
 		inventoryServiceHTTPClient: v1beta2.NewKesselInventoryServiceHTTPClient(client),
 	}, nil
 }

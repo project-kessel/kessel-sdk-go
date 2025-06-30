@@ -13,24 +13,34 @@ import (
 )
 
 func main() {
-	// Example configuration
-	cfg := &config.Config{
-		Endpoint:       "localhost:9000",
-		Insecure:       true,
-		EnableOIDCAuth: false,
-	}
+	// Example gRPC configuration with OAuth2
+	grpcConfig := config.NewGRPCConfig(
+		config.WithGRPCEndpoint("127.0.0.1:9000"),
+		config.WithGRPCInsecure(true),
+		//config.WithGRPCOAuth2(
+		//	"svc-test",
+		//	"h91qw8bPiDj9R6VSORsI5TYbceGU5PMH",
+		//	"http://localhost:8085/realms/redhat-external/protocol/openid-connect/token",
+		//),
+	)
 
-	// Create gRPC client
+	// Create gRPC client with OAuth2 support using builder pattern
 	ctx := context.Background()
-	builder := grpc.NewClientBuilder(cfg.Endpoint).WithInsecure()
 
-	grpcClient, err := client.NewGRPCClient(ctx, cfg, builder)
+	// Option 1: Create builder from config
+	builder := grpc.NewClientBuilderFromConfig(grpcConfig)
+
+	// Option 2: Manual builder configuration (alternative approach)
+	// builder := grpc.NewClientBuilder("localhost:9000").
+	//     WithInsecure()
+
+	grpcClient, err := client.NewGRPCClient(ctx, grpcConfig, builder)
 	if err != nil {
 		// Example of checking for specific error types using sentinel errors
 		if errors.IsConnectionError(err) {
 			log.Fatal("Failed to establish connection:", err)
-		} else if errors.IsHTTPClientError(err) {
-			log.Fatal("HTTP client creation failed:", err)
+		} else if errors.IsTokenError(err) {
+			log.Fatal("OAuth2 token configuration failed:", err)
 		} else {
 			log.Fatal("Unknown error:", err)
 		}
@@ -41,6 +51,7 @@ func main() {
 		}
 	}()
 
+	// Example request
 	checkRequest := &v1beta2.CheckRequest{
 		Object: &v1beta2.ResourceReference{
 			ResourceType: "host",
@@ -57,37 +68,15 @@ func main() {
 			},
 		},
 	}
-	
+
 	// Make the request and handle potential errors
 	response, err := grpcClient.Check(ctx, checkRequest)
 	if err != nil {
-		// Handle different types of errors appropriately
-		switch {
-		case errors.IsTokenError(err):
-			fmt.Println("Authentication issue - token retrieval failed:", err)
-			// Could implement retry logic or re-authentication here
-		case errors.IsConnectionError(err):
-			fmt.Println("Network connectivity issue:", err)
-			// Could implement retry with exponential backoff
-		default:
-			fmt.Println("Request failed with error:", err)
-		}
+		fmt.Printf("Request failed with error: %v\n", err)
 		return
 	}
 
 	// Process successful response
 	fmt.Printf("Check response: %+v\n", response)
 
-	// Additional example showing how to handle token cache errors
-	if err := demonstrateTokenCacheHandling(); err != nil {
-		if errors.IsTokenCacheError(err) {
-			fmt.Println("Token cache miss - this is expected behavior:", err)
-		}
-	}
-}
-
-func demonstrateTokenCacheHandling() error {
-	// This would typically be called within token client logic
-	// Here we simulate a cache miss scenario
-	return errors.NewTokenCacheError("token not found in cache")
 }

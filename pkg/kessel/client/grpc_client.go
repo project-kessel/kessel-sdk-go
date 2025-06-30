@@ -15,42 +15,43 @@ import (
 type GRPCClient struct {
 	conn                   *grpc.ClientConn
 	inventoryServiceClient v1beta2.KesselInventoryServiceClient
-	tokenClient            *auth.TokenClient
-	config                 *config.Config
+	tokenSource            *auth.TokenSource
+	config                 *config.GRPCConfig
 }
 
 func (c *GRPCClient) getTokenCallOption() ([]grpc.CallOption, error) {
 	var opts []grpc.CallOption
-	if c.config.EnableOIDCAuth {
-		opts = append(opts, grpc.EmptyCallOption{})
-		token, err := c.tokenClient.GetToken()
-		if err != nil {
-			return nil, err
-		}
+	if c.config.EnableOauth && c.tokenSource != nil {
 		if c.config.Insecure {
-			opts = append(opts, auth.WithInsecureBearerToken(token.AccessToken))
+			opts = append(opts, c.tokenSource.GetInsecureCallOption())
 		} else {
-			opts = append(opts, auth.WithBearerToken(token.AccessToken))
+			opts = append(opts, c.tokenSource.GetCallOption())
 		}
 	}
 	return opts, nil
 }
 
 // NewGRPCClient creates a new Inventory inventoryServiceClient client
-func NewGRPCClient(ctx context.Context, cfg *config.Config, builder *kesselgrpc.ClientBuilder) (*GRPCClient, error) {
+func NewGRPCClient(ctx context.Context, cfg *config.GRPCConfig, builder *kesselgrpc.ClientBuilder) (*GRPCClient, error) {
 	conn, err := builder.Build()
 	if err != nil {
 		return nil, errors.NewConnectionError(err, "failed to create gRPC connection")
 	}
 
-	var tokenClient *auth.TokenClient
-	if cfg.EnableOIDCAuth {
-		tokenClient = auth.NewTokenClient(cfg)
+	var tokenSource *auth.TokenSource
+	if cfg.EnableOauth {
+		tokenSource, err = auth.NewTokenSource(cfg)
+		if err != nil {
+			if closeErr := conn.Close(); closeErr != nil {
+				log.Printf("Failed to close connection: %v", closeErr)
+			}
+			return nil, errors.NewTokenError(err, "failed to create OAuth2 token source")
+		}
 	}
 
 	return &GRPCClient{
 		config:                 cfg,
-		tokenClient:            tokenClient,
+		tokenSource:            tokenSource,
 		conn:                   conn,
 		inventoryServiceClient: v1beta2.NewKesselInventoryServiceClient(conn),
 	}, nil
