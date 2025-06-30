@@ -17,3 +17,8 @@ all: lint
 lint:
 	@echo "Running golangci-lint"
 	@$(DOCKER) run -t --rm -v $(PWD):/app -w /app golangci/golangci-lint:v2.1 golangci-lint run -v ./examples/... ./pkg/kessel/auth/... ./pkg/kessel/client/... ./pkg/kessel/config/... ./pkg/kessel/errors/... ./pkg/kessel/grpc/... ./pkg/kessel/http/...
+
+.PHONY: test
+test:
+	@echo "Running tests"
+	@go test -v ./pkg/kessel/auth/... ./pkg/kessel/client/... ./pkg/kessel/config/... ./pkg/kessel/errors/... ./pkg/kessel/grpc/... ./pkg/kessel/http/...

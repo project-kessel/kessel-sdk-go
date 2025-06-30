@@ -34,6 +34,7 @@ func NewClientBuilder(endpoint string) *ClientBuilder {
 		insecure:        false,
 		maxIdleConns:    100,
 		idleConnTimeout: 90 * time.Second,
+		interceptors:    []Interceptor{},
 		headers:         make(map[string]string),
 	}
 }
