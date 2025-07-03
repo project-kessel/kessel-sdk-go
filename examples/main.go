@@ -17,15 +17,27 @@ func main() {
 	grpcConfig := config.NewGRPCConfig(
 		config.WithGRPCEndpoint("127.0.0.1:9000"),
 		config.WithGRPCInsecure(true),
+		// Option 1: Direct token URL configuration
 		//config.WithGRPCOAuth2(
 		//	"svc-test",
 		//	"h91qw8bPiDj9R6VSORsI5TYbceGU5PMH",
 		//	"http://localhost:8085/realms/redhat-external/protocol/openid-connect/token",
 		//),
+		// Option 2: Issuer-based configuration with auto-discovery
+		//config.WithGRPCOAuth2Issuer(
+		//	"svc-test",
+		//	"h91qw8bPiDj9R6VSORsI5TYbceGU5PMH",
+		//	"http://localhost:8085/realms/redhat-external",
+		//),
 	)
 
 	// Create gRPC client with OAuth2 support using builder pattern
 	ctx := context.Background()
+
+	// The SDK supports two OAuth2 configuration approaches:
+	// 1. Direct token URL: Specify the exact OAuth2 token endpoint URL
+	// 2. Issuer-based discovery: Provide the issuer URL and let the SDK discover
+	//    the token endpoint via OpenID Connect Discovery (/.well-known/openid_configuration)
 
 	// Option 1: Create builder from config
 	builder := grpc.NewClientBuilderFromConfig(grpcConfig)

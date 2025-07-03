@@ -1,7 +1,9 @@
 package config
 
 import (
+	"context"
 	"crypto/tls"
+	"strings"
 	"testing"
 	"time"
 )
@@ -18,9 +20,6 @@ func TestNewGRPCConfig(t *testing.T) {
 			validate: func(t *testing.T, cfg *GRPCConfig) {
 				if cfg.Insecure {
 					t.Error("expected Insecure to be false by default")
-				}
-				if cfg.Timeout != 30*time.Second {
-					t.Errorf("expected Timeout to be 30s, got %v", cfg.Timeout)
 				}
 			},
 		},
@@ -63,17 +62,7 @@ func TestNewGRPCConfig(t *testing.T) {
 				}
 			},
 		},
-		{
-			name: "with timeout",
-			options: []GRPCClientOption{
-				WithGRPCTimeout(60 * time.Second),
-			},
-			validate: func(t *testing.T, cfg *GRPCConfig) {
-				if cfg.Timeout != 60*time.Second {
-					t.Errorf("expected Timeout to be 60s, got %v", cfg.Timeout)
-				}
-			},
-		},
+
 		{
 			name: "with message sizes",
 			options: []GRPCClientOption{
@@ -107,6 +96,35 @@ func TestNewGRPCConfig(t *testing.T) {
 				}
 				if cfg.Oauth2.TokenURL != "https://auth.example.com/token" {
 					t.Errorf("expected TokenURL to be 'https://auth.example.com/token', got %q", cfg.Oauth2.TokenURL)
+				}
+				expectedScopes := []string{"scope1", "scope2"}
+				if len(cfg.Oauth2.Scopes) != len(expectedScopes) {
+					t.Errorf("expected %d scopes, got %d", len(expectedScopes), len(cfg.Oauth2.Scopes))
+				}
+				for i, scope := range expectedScopes {
+					if i < len(cfg.Oauth2.Scopes) && cfg.Oauth2.Scopes[i] != scope {
+						t.Errorf("expected scope[%d] to be %q, got %q", i, scope, cfg.Oauth2.Scopes[i])
+					}
+				}
+			},
+		},
+		{
+			name: "with OAuth2 Issuer",
+			options: []GRPCClientOption{
+				WithGRPCOAuth2Issuer("issuer-client-id", "issuer-client-secret", "https://auth.example.com", "scope1", "scope2"),
+			},
+			validate: func(t *testing.T, cfg *GRPCConfig) {
+				if !cfg.EnableOauth {
+					t.Error("expected EnableOauth to be true")
+				}
+				if cfg.Oauth2.ClientID != "issuer-client-id" {
+					t.Errorf("expected ClientID to be 'issuer-client-id', got %q", cfg.Oauth2.ClientID)
+				}
+				if cfg.Oauth2.ClientSecret != "issuer-client-secret" {
+					t.Errorf("expected ClientSecret to be 'issuer-client-secret', got %q", cfg.Oauth2.ClientSecret)
+				}
+				if cfg.Oauth2.IssuerURL != "https://auth.example.com" {
+					t.Errorf("expected IssuerURL to be 'https://auth.example.com', got %q", cfg.Oauth2.IssuerURL)
 				}
 				expectedScopes := []string{"scope1", "scope2"}
 				if len(cfg.Oauth2.Scopes) != len(expectedScopes) {
@@ -261,6 +279,35 @@ func TestNewHTTPConfig(t *testing.T) {
 				}
 			},
 		},
+		{
+			name: "with OAuth2 Issuer",
+			options: []HTTPClientOption{
+				WithHTTPOAuth2Issuer("http-issuer-client-id", "http-issuer-client-secret", "https://auth.example.com", "read", "write"),
+			},
+			validate: func(t *testing.T, cfg *HTTPConfig) {
+				if !cfg.EnableOauth {
+					t.Error("expected EnableOauth to be true")
+				}
+				if cfg.Oauth2.ClientID != "http-issuer-client-id" {
+					t.Errorf("expected ClientID to be 'http-issuer-client-id', got %q", cfg.Oauth2.ClientID)
+				}
+				if cfg.Oauth2.ClientSecret != "http-issuer-client-secret" {
+					t.Errorf("expected ClientSecret to be 'http-issuer-client-secret', got %q", cfg.Oauth2.ClientSecret)
+				}
+				if cfg.Oauth2.IssuerURL != "https://auth.example.com" {
+					t.Errorf("expected IssuerURL to be 'https://auth.example.com', got %q", cfg.Oauth2.IssuerURL)
+				}
+				expectedScopes := []string{"read", "write"}
+				if len(cfg.Oauth2.Scopes) != len(expectedScopes) {
+					t.Errorf("expected %d scopes, got %d", len(expectedScopes), len(cfg.Oauth2.Scopes))
+				}
+				for i, scope := range expectedScopes {
+					if i < len(cfg.Oauth2.Scopes) && cfg.Oauth2.Scopes[i] != scope {
+						t.Errorf("expected scope[%d] to be %q, got %q", i, scope, cfg.Oauth2.Scopes[i])
+					}
+				}
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -347,11 +394,60 @@ func TestOauth2_EmptyValues(t *testing.T) {
 	}
 }
 
+func TestOauth2_DiscoverTokenEndpoint(t *testing.T) {
+	tests := []struct {
+		name        string
+		oauth2      *Oauth2
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name: "missing issuer URL",
+			oauth2: &Oauth2{
+				ClientID:     "test-client",
+				ClientSecret: "test-secret",
+			},
+			expectError: true,
+			errorMsg:    "issuer_url is required",
+		},
+		{
+			name: "invalid issuer URL",
+			oauth2: &Oauth2{
+				ClientID:     "test-client",
+				ClientSecret: "test-secret",
+				IssuerURL:    "https://invalid-issuer.example.com",
+			},
+			expectError: true,
+			errorMsg:    "failed to fetch discovery document",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			err := tt.oauth2.DiscoverTokenEndpoint(ctx)
+
+			if tt.expectError {
+				if err == nil {
+					t.Fatal("expected error but got none")
+				}
+				if !strings.Contains(err.Error(), tt.errorMsg) {
+					t.Errorf("expected error message to contain %q, got %q", tt.errorMsg, err.Error())
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
 func TestMultipleOptions(t *testing.T) {
 	cfg := NewGRPCConfig(
 		WithGRPCEndpoint("localhost:8080"),
 		WithGRPCInsecure(true),
-		WithGRPCTimeout(45*time.Second),
 		WithGRPCMaxReceiveMessageSize(16*1024*1024),
 		WithGRPCMaxSendMessageSize(16*1024*1024),
 		WithGRPCOAuth2("multi-client", "multi-secret", "https://multi.example.com/token", "scope1", "scope2", "scope3"),
@@ -363,9 +459,6 @@ func TestMultipleOptions(t *testing.T) {
 	}
 	if !cfg.Insecure {
 		t.Error("expected Insecure to be true")
-	}
-	if cfg.Timeout != 45*time.Second {
-		t.Errorf("expected Timeout to be 45s, got %v", cfg.Timeout)
 	}
 	expectedSize := 16 * 1024 * 1024
 	if cfg.MaxReceiveMessageSize != expectedSize {

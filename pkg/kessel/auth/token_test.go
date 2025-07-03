@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	stderrors "errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -83,17 +84,46 @@ func TestNewTokenSource(t *testing.T) {
 			errorCode:   codes.InvalidArgument,
 		},
 		{
-			name: "missing token URL",
+			name: "missing token URL and issuer URL",
 			config: &mockOAuthConfig{
 				enableOauth: true,
 				oauth2: config.Oauth2{
 					ClientID:     "test-client",
 					ClientSecret: "test-secret",
 					TokenURL:     "",
+					IssuerURL:    "",
 				},
 			},
 			expectError: true,
 			errorCode:   codes.InvalidArgument,
+		},
+		{
+			name: "valid issuer URL (will fail with network error)",
+			config: &mockOAuthConfig{
+				enableOauth: true,
+				oauth2: config.Oauth2{
+					ClientID:     "test-client",
+					ClientSecret: "test-secret",
+					TokenURL:     "",
+					IssuerURL:    "https://auth.example.com",
+				},
+			},
+			expectError: true,
+			errorCode:   codes.InvalidArgument,
+		},
+		{
+			name: "token URL takes precedence over issuer URL",
+			config: &mockOAuthConfig{
+				enableOauth: true,
+				oauth2: config.Oauth2{
+					ClientID:     "test-client",
+					ClientSecret: "test-secret",
+					TokenURL:     "https://auth.example.com/token",
+					IssuerURL:    "https://auth.example.com",
+					Scopes:       []string{"scope1", "scope2"},
+				},
+			},
+			expectError: false,
 		},
 	}
 
@@ -345,6 +375,106 @@ func TestTokenSource_Integration(t *testing.T) {
 	insecureCreds := ts.GetInsecureCallOption()
 	if insecureCreds == nil {
 		t.Fatal("expected insecure call option but got nil")
+	}
+}
+
+func TestTokenSource_WithIssuerConfig(t *testing.T) {
+	// Test with gRPC config using issuer
+	cfg := &config.GRPCConfig{
+		BaseConfig: config.BaseConfig{
+			EnableOauth: true,
+			Oauth2: config.Oauth2{
+				ClientID:     "issuer-test-client",
+				ClientSecret: "issuer-test-secret",
+				IssuerURL:    "https://auth.example.com",
+				Scopes:       []string{"read", "write"},
+			},
+		},
+	}
+
+	// This should fail with network error since the issuer URL is fake
+	_, err := NewTokenSource(cfg)
+	if err == nil {
+		t.Fatal("expected error with fake issuer URL but got none")
+	}
+
+	// Error should mention discovery failure
+	if !strings.Contains(err.Error(), "failed to discover token endpoint") {
+		t.Errorf("expected error message to mention discovery failure, got %q", err.Error())
+	}
+}
+
+func TestTokenSource_WithBothTokenURLAndIssuer(t *testing.T) {
+	// Test that TokenURL takes precedence over IssuerURL
+	cfg := &config.GRPCConfig{
+		BaseConfig: config.BaseConfig{
+			EnableOauth: true,
+			Oauth2: config.Oauth2{
+				ClientID:     "both-test-client",
+				ClientSecret: "both-test-secret",
+				TokenURL:     "https://auth.example.com/token",
+				IssuerURL:    "https://auth.example.com",
+				Scopes:       []string{"read", "write"},
+			},
+		},
+	}
+
+	ts, err := NewTokenSource(cfg)
+	if err != nil {
+		t.Fatalf("unexpected error creating token source: %v", err)
+	}
+
+	if ts == nil {
+		t.Fatal("expected token source but got nil")
+	}
+
+	// Verify that we can get credentials without errors
+	creds := ts.GetGRPCCredentials()
+	if creds == nil {
+		t.Fatal("expected credentials but got nil")
+	}
+}
+
+func TestDiscoverTokenEndpoint(t *testing.T) {
+	tests := []struct {
+		name        string
+		issuerURL   string
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name:        "invalid issuer URL",
+			issuerURL:   "https://invalid-issuer.example.com",
+			expectError: true,
+			errorMsg:    "failed to fetch discovery document",
+		},
+		{
+			name:        "empty issuer URL",
+			issuerURL:   "",
+			expectError: true,
+			errorMsg:    "failed to fetch discovery document",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ctx := context.Background()
+			_, err := discoverTokenEndpoint(ctx, tt.issuerURL)
+
+			if tt.expectError {
+				if err == nil {
+					t.Fatal("expected error but got none")
+				}
+				if !strings.Contains(err.Error(), tt.errorMsg) {
+					t.Errorf("expected error message to contain %q, got %q", tt.errorMsg, err.Error())
+				}
+				return
+			}
+
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
 	}
 }
 
