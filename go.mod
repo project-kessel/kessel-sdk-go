@@ -5,7 +5,6 @@ go 1.24.4
 require (
 	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.6-20250613105001-9f2d3c737feb.1
 	github.com/go-kratos/kratos/v2 v2.8.4
-	github.com/project-kessel/inventory-api v0.0.0-20250619143533-0247b301d7c5
 	golang.org/x/oauth2 v0.30.0
 	google.golang.org/genproto v0.0.0-20231212172506-995d672761c0
 	google.golang.org/genproto/googleapis/api v0.0.0-20250603155806-513f23925822

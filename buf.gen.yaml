@@ -5,32 +5,14 @@ inputs:
   - module: buf.build/googleapis/googleapis
 plugins:
   - local: protoc-gen-go
-    out: pkg
+    out: .
     opt:
       - paths=source_relative
   - local: protoc-gen-go-grpc
-    out: pkg
+    out: .
     opt:
       - paths=source_relative
   - local: protoc-gen-go-http
-    out: pkg
+    out: .
     opt:
       - paths=source_relative
-managed:
-  enabled: true
-  override:
-    - file_option: go_package_prefix
-      value: github.com/project-kessel/kessel-sdk-go/pkg/kessel
-    - file_option: go_package_prefix
-      module: buf.build/bufbuild/protovalidate
-      value: github.com/project-kessel/kessel-sdk-go/pkg/kessel
-    - file_option: go_package_prefix
-      module: buf.build/googleapis/googleapis
-      value: github.com/project-kessel/kessel-sdk-go/pkg/kessel
-  disable:
-    - file_option: go_package
-      module: buf.build/project-kessel/inventory-api
-    - file_option: go_package
-      module: buf.build/bufbuild/protovalidate
-    - file_option: go_package  
-      module: buf.build/googleapis/googleapis
