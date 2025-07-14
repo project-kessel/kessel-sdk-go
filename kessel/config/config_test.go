@@ -5,7 +5,6 @@ import (
 	"crypto/tls"
 	"strings"
 	"testing"
-	"time"
 )
 
 func TestNewGRPCConfig(t *testing.T) {
@@ -147,176 +146,7 @@ func TestNewGRPCConfig(t *testing.T) {
 	}
 }
 
-func TestNewHTTPConfig(t *testing.T) {
-	tests := []struct {
-		name     string
-		options  []HTTPClientOption
-		validate func(*testing.T, *HTTPConfig)
-	}{
-		{
-			name:    "default config",
-			options: []HTTPClientOption{},
-			validate: func(t *testing.T, cfg *HTTPConfig) {
-				if cfg.Insecure {
-					t.Error("expected Insecure to be false by default")
-				}
-				if cfg.Timeout != 10*time.Second {
-					t.Errorf("expected Timeout to be 10s, got %v", cfg.Timeout)
-				}
-				if cfg.UserAgent != "kessel-go-sdk" {
-					t.Errorf("expected UserAgent to be 'kessel-go-sdk', got %q", cfg.UserAgent)
-				}
-				if cfg.MaxIdleConns != 100 {
-					t.Errorf("expected MaxIdleConns to be 100, got %d", cfg.MaxIdleConns)
-				}
-				if cfg.IdleConnTimeout != 90*time.Second {
-					t.Errorf("expected IdleConnTimeout to be 90s, got %v", cfg.IdleConnTimeout)
-				}
-			},
-		},
-		{
-			name: "with endpoint",
-			options: []HTTPClientOption{
-				WithHTTPEndpoint("https://api.example.com"),
-			},
-			validate: func(t *testing.T, cfg *HTTPConfig) {
-				if cfg.Endpoint != "https://api.example.com" {
-					t.Errorf("expected Endpoint to be 'https://api.example.com', got %q", cfg.Endpoint)
-				}
-			},
-		},
-		{
-			name: "with insecure",
-			options: []HTTPClientOption{
-				WithHTTPInsecure(true),
-			},
-			validate: func(t *testing.T, cfg *HTTPConfig) {
-				if !cfg.Insecure {
-					t.Error("expected Insecure to be true")
-				}
-			},
-		},
-		{
-			name: "with TLS config",
-			options: []HTTPClientOption{
-				WithHTTPTLSConfig(&tls.Config{ServerName: "example.com"}),
-			},
-			validate: func(t *testing.T, cfg *HTTPConfig) {
-				if cfg.Insecure {
-					t.Error("expected Insecure to be false when TLS config is set")
-				}
-				if cfg.TLSConfig == nil {
-					t.Error("expected TLSConfig to be set")
-				}
-				if cfg.TLSConfig.ServerName != "example.com" {
-					t.Errorf("expected ServerName to be 'example.com', got %q", cfg.TLSConfig.ServerName)
-				}
-			},
-		},
-		{
-			name: "with timeout",
-			options: []HTTPClientOption{
-				WithHTTPTimeout(30 * time.Second),
-			},
-			validate: func(t *testing.T, cfg *HTTPConfig) {
-				if cfg.Timeout != 30*time.Second {
-					t.Errorf("expected Timeout to be 30s, got %v", cfg.Timeout)
-				}
-			},
-		},
-		{
-			name: "with user agent",
-			options: []HTTPClientOption{
-				WithHTTPUserAgent("custom-agent/1.0"),
-			},
-			validate: func(t *testing.T, cfg *HTTPConfig) {
-				if cfg.UserAgent != "custom-agent/1.0" {
-					t.Errorf("expected UserAgent to be 'custom-agent/1.0', got %q", cfg.UserAgent)
-				}
-			},
-		},
-		{
-			name: "with connection settings",
-			options: []HTTPClientOption{
-				WithHTTPMaxIdleConns(200),
-				WithHTTPIdleConnTimeout(120 * time.Second),
-			},
-			validate: func(t *testing.T, cfg *HTTPConfig) {
-				if cfg.MaxIdleConns != 200 {
-					t.Errorf("expected MaxIdleConns to be 200, got %d", cfg.MaxIdleConns)
-				}
-				if cfg.IdleConnTimeout != 120*time.Second {
-					t.Errorf("expected IdleConnTimeout to be 120s, got %v", cfg.IdleConnTimeout)
-				}
-			},
-		},
-		{
-			name: "with OAuth2",
-			options: []HTTPClientOption{
-				WithHTTPOAuth2("http-client-id", "http-client-secret", "https://auth.example.com/token", "read", "write"),
-			},
-			validate: func(t *testing.T, cfg *HTTPConfig) {
-				if !cfg.EnableOauth {
-					t.Error("expected EnableOauth to be true")
-				}
-				if cfg.Oauth2.ClientID != "http-client-id" {
-					t.Errorf("expected ClientID to be 'http-client-id', got %q", cfg.Oauth2.ClientID)
-				}
-				if cfg.Oauth2.ClientSecret != "http-client-secret" {
-					t.Errorf("expected ClientSecret to be 'http-client-secret', got %q", cfg.Oauth2.ClientSecret)
-				}
-				if cfg.Oauth2.TokenURL != "https://auth.example.com/token" {
-					t.Errorf("expected TokenURL to be 'https://auth.example.com/token', got %q", cfg.Oauth2.TokenURL)
-				}
-				expectedScopes := []string{"read", "write"}
-				if len(cfg.Oauth2.Scopes) != len(expectedScopes) {
-					t.Errorf("expected %d scopes, got %d", len(expectedScopes), len(cfg.Oauth2.Scopes))
-				}
-				for i, scope := range expectedScopes {
-					if i < len(cfg.Oauth2.Scopes) && cfg.Oauth2.Scopes[i] != scope {
-						t.Errorf("expected scope[%d] to be %q, got %q", i, scope, cfg.Oauth2.Scopes[i])
-					}
-				}
-			},
-		},
-		{
-			name: "with OAuth2 Issuer",
-			options: []HTTPClientOption{
-				WithHTTPOAuth2Issuer("http-issuer-client-id", "http-issuer-client-secret", "https://auth.example.com", "read", "write"),
-			},
-			validate: func(t *testing.T, cfg *HTTPConfig) {
-				if !cfg.EnableOauth {
-					t.Error("expected EnableOauth to be true")
-				}
-				if cfg.Oauth2.ClientID != "http-issuer-client-id" {
-					t.Errorf("expected ClientID to be 'http-issuer-client-id', got %q", cfg.Oauth2.ClientID)
-				}
-				if cfg.Oauth2.ClientSecret != "http-issuer-client-secret" {
-					t.Errorf("expected ClientSecret to be 'http-issuer-client-secret', got %q", cfg.Oauth2.ClientSecret)
-				}
-				if cfg.Oauth2.IssuerURL != "https://auth.example.com" {
-					t.Errorf("expected IssuerURL to be 'https://auth.example.com', got %q", cfg.Oauth2.IssuerURL)
-				}
-				expectedScopes := []string{"read", "write"}
-				if len(cfg.Oauth2.Scopes) != len(expectedScopes) {
-					t.Errorf("expected %d scopes, got %d", len(expectedScopes), len(cfg.Oauth2.Scopes))
-				}
-				for i, scope := range expectedScopes {
-					if i < len(cfg.Oauth2.Scopes) && cfg.Oauth2.Scopes[i] != scope {
-						t.Errorf("expected scope[%d] to be %q, got %q", i, scope, cfg.Oauth2.Scopes[i])
-					}
-				}
-			},
-		},
-	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			cfg := NewHTTPConfig(tt.options...)
-			tt.validate(t, cfg)
-		})
-	}
-}
 
 func TestGRPCConfig_OAuthInterface(t *testing.T) {
 	cfg := NewGRPCConfig(
@@ -342,35 +172,7 @@ func TestGRPCConfig_OAuthInterface(t *testing.T) {
 	}
 }
 
-func TestHTTPConfig_OAuthInterface(t *testing.T) {
-	cfg := NewHTTPConfig(
-		WithHTTPOAuth2("http-client", "http-secret", "https://auth.example.com/token", "read", "write"),
-	)
 
-	if !cfg.GetEnableOauth() {
-		t.Error("expected GetEnableOauth to return true")
-	}
-
-	oauth2 := cfg.GetOauth2()
-	if oauth2.ClientID != "http-client" {
-		t.Errorf("expected ClientID to be 'http-client', got %q", oauth2.ClientID)
-	}
-	if oauth2.ClientSecret != "http-secret" {
-		t.Errorf("expected ClientSecret to be 'http-secret', got %q", oauth2.ClientSecret)
-	}
-	if oauth2.TokenURL != "https://auth.example.com/token" {
-		t.Errorf("expected TokenURL to be 'https://auth.example.com/token', got %q", oauth2.TokenURL)
-	}
-	expectedScopes := []string{"read", "write"}
-	if len(oauth2.Scopes) != len(expectedScopes) {
-		t.Errorf("expected %d scopes, got %d", len(expectedScopes), len(oauth2.Scopes))
-	}
-	for i, scope := range expectedScopes {
-		if i < len(oauth2.Scopes) && oauth2.Scopes[i] != scope {
-			t.Errorf("expected scope[%d] to be %q, got %q", i, scope, oauth2.Scopes[i])
-		}
-	}
-}
 
 func TestOauth2_EmptyValues(t *testing.T) {
 	cfg := NewGRPCConfig()

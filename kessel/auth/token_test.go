@@ -478,29 +478,7 @@ func TestDiscoverTokenEndpoint(t *testing.T) {
 	}
 }
 
-func TestTokenSource_WithHTTPConfig(t *testing.T) {
-	// Test with HTTP config structure
-	cfg := &config.HTTPConfig{
-		BaseConfig: config.BaseConfig{
-			EnableOauth: true,
-			Oauth2: config.Oauth2{
-				ClientID:     "http-test-client",
-				ClientSecret: "http-test-secret",
-				TokenURL:     "https://auth.example.com/token",
-				Scopes:       []string{"api:read", "api:write"},
-			},
-		},
-	}
 
-	ts, err := NewTokenSource(cfg)
-	if err != nil {
-		t.Fatalf("unexpected error creating token source: %v", err)
-	}
-
-	if ts == nil {
-		t.Fatal("expected token source but got nil")
-	}
-}
 
 func TestError_CreationWithNewTokenSource(t *testing.T) {
 	// Test error creation from NewTokenSource

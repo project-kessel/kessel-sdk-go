@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-// BaseConfig contains common configuration shared between HTTP and gRPC
+// BaseConfig contains common configuration for gRPC client
 type BaseConfig struct {
 	// Endpoint specifies the server address (host:port)
 	Endpoint string `json:"endpoint" env:"KESSEL_ENDPOINT"`
@@ -39,23 +39,6 @@ type GRPCConfig struct {
 
 	// MaxSendMessageSize sets the maximum message size in bytes the client can send
 	MaxSendMessageSize int `json:"max_send_message_size" env:"KESSEL_GRPC_MAX_SEND_MESSAGE_SIZE" default:"4194304"`
-}
-
-// HTTPConfig contains HTTP-specific configuration
-type HTTPConfig struct {
-	BaseConfig
-
-	// Timeout specifies the default request timeout for HTTP calls
-	Timeout time.Duration `json:"timeout" env:"KESSEL_HTTP_TIMEOUT" default:"10s"`
-
-	// UserAgent specifies the client user agent
-	UserAgent string `json:"user_agent" env:"KESSEL_HTTP_USER_AGENT" default:"kessel-go-sdk"`
-
-	// MaxIdleConns controls the maximum number of idle connections
-	MaxIdleConns int `json:"max_idle_conns" env:"KESSEL_HTTP_MAX_IDLE_CONNS" default:"100"`
-
-	// IdleConnTimeout is the maximum amount of time an idle connection will remain idle
-	IdleConnTimeout time.Duration `json:"idle_conn_timeout" env:"KESSEL_HTTP_IDLE_CONN_TIMEOUT" default:"90s"`
 }
 
 // Oauth2 contains OAuth2 configuration
@@ -134,9 +117,6 @@ func (o *Oauth2) DiscoverTokenEndpoint(ctx context.Context) error {
 // GRPCClientOption defines a function type for gRPC client configuration
 type GRPCClientOption func(*GRPCConfig)
 
-// HTTPClientOption defines a function type for HTTP client configuration
-type HTTPClientOption func(*HTTPConfig)
-
 // GRPC Configuration Options
 
 func WithGRPCEndpoint(endpoint string) GRPCClientOption {
@@ -191,72 +171,6 @@ func WithGRPCOAuth2Issuer(clientID, clientSecret, issuerURL string, scopes ...st
 	}
 }
 
-// HTTP Configuration Options
-
-func WithHTTPEndpoint(endpoint string) HTTPClientOption {
-	return func(c *HTTPConfig) {
-		c.Endpoint = endpoint
-	}
-}
-
-func WithHTTPInsecure(insecure bool) HTTPClientOption {
-	return func(c *HTTPConfig) {
-		c.Insecure = insecure
-	}
-}
-
-func WithHTTPTLSConfig(tlsConfig *tls.Config) HTTPClientOption {
-	return func(c *HTTPConfig) {
-		c.Insecure = false
-		c.TLSConfig = tlsConfig
-	}
-}
-
-func WithHTTPTimeout(timeout time.Duration) HTTPClientOption {
-	return func(c *HTTPConfig) {
-		c.Timeout = timeout
-	}
-}
-
-func WithHTTPUserAgent(userAgent string) HTTPClientOption {
-	return func(c *HTTPConfig) {
-		c.UserAgent = userAgent
-	}
-}
-
-func WithHTTPMaxIdleConns(maxIdleConns int) HTTPClientOption {
-	return func(c *HTTPConfig) {
-		c.MaxIdleConns = maxIdleConns
-	}
-}
-
-func WithHTTPIdleConnTimeout(timeout time.Duration) HTTPClientOption {
-	return func(c *HTTPConfig) {
-		c.IdleConnTimeout = timeout
-	}
-}
-
-func WithHTTPOAuth2(clientID, clientSecret, tokenURL string, scopes ...string) HTTPClientOption {
-	return func(c *HTTPConfig) {
-		c.EnableOauth = true
-		c.Oauth2.ClientID = clientID
-		c.Oauth2.ClientSecret = clientSecret
-		c.Oauth2.TokenURL = tokenURL
-		c.Oauth2.Scopes = scopes
-	}
-}
-
-// WithHTTPOAuth2Issuer configures OAuth2 authentication using an issuer URL for token endpoint discovery
-func WithHTTPOAuth2Issuer(clientID, clientSecret, issuerURL string, scopes ...string) HTTPClientOption {
-	return func(c *HTTPConfig) {
-		c.EnableOauth = true
-		c.Oauth2.ClientID = clientID
-		c.Oauth2.ClientSecret = clientSecret
-		c.Oauth2.IssuerURL = issuerURL
-		c.Oauth2.Scopes = scopes
-	}
-}
-
 // GetEnableOauth returns the OAuth enable flag for GRPCConfig
 func (c *GRPCConfig) GetEnableOauth() bool {
 	return c.EnableOauth
@@ -264,16 +178,6 @@ func (c *GRPCConfig) GetEnableOauth() bool {
 
 // GetOauth2 returns the OAuth2 configuration for GRPCConfig
 func (c *GRPCConfig) GetOauth2() Oauth2 {
-	return c.Oauth2
-}
-
-// GetEnableOauth returns the OAuth enable flag for HTTPConfig
-func (c *HTTPConfig) GetEnableOauth() bool {
-	return c.EnableOauth
-}
-
-// GetOauth2 returns the OAuth2 configuration for HTTPConfig
-func (c *HTTPConfig) GetOauth2() Oauth2 {
 	return c.Oauth2
 }
 
@@ -285,25 +189,6 @@ func NewGRPCConfig(options ...GRPCClientOption) *GRPCConfig {
 		},
 		MaxReceiveMessageSize: 4 * 1024 * 1024, // 4MB
 		MaxSendMessageSize:    4 * 1024 * 1024, // 4MB
-	}
-
-	for _, option := range options {
-		option(config)
-	}
-
-	return config
-}
-
-// NewHTTPConfig creates a new HTTP configuration with default values
-func NewHTTPConfig(options ...HTTPClientOption) *HTTPConfig {
-	config := &HTTPConfig{
-		BaseConfig: BaseConfig{
-			Insecure: false,
-		},
-		Timeout:         10 * time.Second,
-		UserAgent:       "kessel-go-sdk",
-		MaxIdleConns:    100,
-		IdleConnTimeout: 90 * time.Second,
 	}
 
 	for _, option := range options {

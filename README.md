@@ -1,11 +1,11 @@
 # Kessel SDK for Go
 
 
-The official Go SDK for the Kessel inventory and authorization service. This SDK provides both gRPC and HTTP client implementations with built-in OAuth2 support for secure authentication.
+The official Go SDK for the Kessel inventory and authorization service. This SDK provides gRPC client implementation with built-in OAuth2 support for secure authentication.
 
 ## Features
 
-- **gRPC and HTTP client support** - Choose the transport that fits your needs
+- **gRPC client support** - High-performance gRPC communication
 - **OAuth2 authentication** - Built-in support with token refresh and caching
 - **Flexible configuration** - Direct token URL or issuer-based discovery
 - **Type-safe API** - Generated from protobuf definitions
@@ -78,55 +78,7 @@ func main() {
 }
 ```
 
-### HTTP Client
 
-```go
-package main
-
-import (
-    "context"
-    "log"
-    "time"
-
-    inventoryapi "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
-    "github.com/project-kessel/kessel-sdk-go/kessel/config"
-    v1beta2 "github.com/project-kessel/kessel-sdk-go/kessel/inventory/v1beta2"
-)
-
-func main() {
-    // Configure HTTP client with OAuth2
-    cfg := config.NewHTTPConfig(
-        config.WithHTTPEndpoint("https://your-kessel-server"),
-        config.WithHTTPTimeout(30*time.Second),
-        config.WithHTTPOAuth2(
-            "your-client-id",
-            "your-client-secret",
-            "https://your-auth-server/token",
-        ),
-    )
-
-    // Create client
-    client, err := v1beta2.NewInventoryHTTPClient(cfg)
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    // Make API call with explicit token handling
-    request := &inventoryapi.CheckRequest{/* ... */}
-    
-    tokenOpts, err := client.GetTokenHTTPOption()
-    if err != nil {
-        log.Fatal(err)
-    }
-    
-    response, err := client.KesselInventoryService.Check(context.Background(), request, tokenOpts...)
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    log.Printf("Check result: %v", response.Allowed)
-}
-```
 
 ## Configuration
 
@@ -191,20 +143,16 @@ config.WithGRPCTLSConfig(tlsConfig)
 ### Client Types
 
 - `InventoryGRPCClient` - gRPC client for the Kessel Inventory service
-- `InventoryHTTPClient` - HTTP client for the Kessel Inventory service
 
 ### Authentication Methods
 
-Both clients provide multiple ways to handle OAuth2 tokens:
+The client provides multiple ways to handle OAuth2 tokens:
 
 #### Explicit Token Handling
 
 ```go
 // Manual token retrieval and injection
-tokenOpts, err := client.GetTokenCallOption() // For gRPC
-// or
-tokenOpts, err := client.GetTokenHTTPOption() // For HTTP
-
+tokenOpts, err := client.GetTokenCallOption()
 if err != nil {
     return err
 }
@@ -223,16 +171,6 @@ response, err := client.KesselInventoryService.Check(ctx, request, tokenOpts...)
 - `WithGRPCMaxSendMessageSize(int)` - Set max send message size
 - `WithGRPCOAuth2(clientID, secret, tokenURL, scopes...)` - OAuth2 with direct token URL
 - `WithGRPCOAuth2Issuer(clientID, secret, issuerURL, scopes...)` - OAuth2 with issuer discovery
-
-#### HTTP Options
-
-- `WithHTTPEndpoint(endpoint)` - Set server endpoint
-- `WithHTTPInsecure(bool)` - Enable/disable TLS verification
-- `WithHTTPTLSConfig(*tls.Config)` - Custom TLS configuration
-- `WithHTTPTimeout(duration)` - Set request timeout
-- `WithHTTPUserAgent(string)` - Set user agent
-- `WithHTTPOAuth2(clientID, secret, tokenURL, scopes...)` - OAuth2 with direct token URL
-- `WithHTTPOAuth2Issuer(clientID, secret, issuerURL, scopes...)` - OAuth2 with issuer discovery
 
 ## Error Handling
 
@@ -256,14 +194,12 @@ if err != nil {
 Available error checkers:
 - `errors.IsConnectionError(err)` - Network/connection failures
 - `errors.IsTokenError(err)` - OAuth2 authentication failures
-- `errors.IsHTTPClientError(err)` - HTTP client configuration issues
 
 ## Examples
 
 Complete examples are available in the [`examples/`](./examples/) directory:
 
 - [`examples/grpc/main.go`](./examples/grpc/main.go) - gRPC client usage
-- [`examples/http/http_example.go`](./examples/http/http_example.go) - HTTP client usage
 
 To run the examples:
 
@@ -273,9 +209,6 @@ make build
 
 # Run gRPC example
 ./bin/grpc-example
-
-# Run HTTP example  
-./bin/http-example
 ```
 
 ## Development
