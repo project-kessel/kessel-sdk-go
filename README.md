@@ -30,23 +30,18 @@ import (
     "log"
 
     inventoryapi "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
-    "github.com/project-kessel/kessel-sdk-go/kessel/config"
     v1beta2 "github.com/project-kessel/kessel-sdk-go/kessel/inventory/v1beta2"
 )
 
 func main() {
-    // Configure gRPC client with OAuth2
-    cfg := config.NewGRPCConfig(
-        config.WithGRPCEndpoint("your-kessel-server:9000"),
-        config.WithGRPCOAuth2(
-            "your-client-id",
-            "your-client-secret", 
-            "https://your-auth-server/token",
-        ),
-    )
-
-    // Create client
-    client, err := v1beta2.NewInventoryGRPCClient(cfg)
+    // Create client using fluent builder pattern
+    client, err := v1beta2.NewInventoryGRPCClientBuilder().
+        WithEndpoint("your-kessel-server:9000").
+        WithOAuth2("your-client-id", "your-client-secret", "https://your-auth-server/token").
+        WithMaxReceiveMessageSize(8 * 1024 * 1024). // 8MB
+        WithMaxSendMessageSize(4 * 1024 * 1024).    // 4MB
+        Build()
+    
     if err != nil {
         log.Fatal(err)
     }
@@ -162,15 +157,51 @@ response, err := client.KesselInventoryService.Check(ctx, request, tokenOpts...)
 
 ### Configuration Options
 
-#### gRPC Options
+#### Fluent Builder Methods
 
-- `WithGRPCEndpoint(endpoint)` - Set server endpoint
-- `WithGRPCInsecure(bool)` - Enable/disable TLS
-- `WithGRPCTLSConfig(*tls.Config)` - Custom TLS configuration
-- `WithGRPCMaxReceiveMessageSize(int)` - Set max receive message size
-- `WithGRPCMaxSendMessageSize(int)` - Set max send message size
-- `WithGRPCOAuth2(clientID, secret, tokenURL, scopes...)` - OAuth2 with direct token URL
-- `WithGRPCOAuth2Issuer(clientID, secret, issuerURL, scopes...)` - OAuth2 with issuer discovery
+- `WithEndpoint(endpoint)` - Set server endpoint
+- `WithInsecure(bool)` - Enable/disable TLS
+- `WithTLSConfig(*tls.Config)` - Custom TLS configuration
+- `WithMaxReceiveMessageSize(int)` - Set max receive message size
+- `WithMaxSendMessageSize(int)` - Set max send message size
+- `WithOAuth2(clientID, secret, tokenURL, scopes...)` - OAuth2 with direct token URL
+- `WithOAuth2Issuer(clientID, secret, issuerURL, scopes...)` - OAuth2 with issuer discovery
+- `WithDialOption(grpc.DialOption)` - Add custom gRPC dial options
+
+```go
+// Example configurations using the fluent builder pattern:
+
+// Basic insecure client
+client, err := v1beta2.NewInventoryGRPCClientBuilder().
+    WithEndpoint("localhost:9000").
+    WithInsecure(true).
+    Build()
+
+// Secure client with OAuth2 and custom message sizes
+client, err := v1beta2.NewInventoryGRPCClientBuilder().
+    WithEndpoint("secure.example.com:9000").
+    WithOAuth2("client-id", "client-secret", "https://auth.example.com/token").
+    WithMaxReceiveMessageSize(16 * 1024 * 1024). // 16MB
+    WithMaxSendMessageSize(4 * 1024 * 1024).     // 4MB
+    Build()
+
+// Client with OAuth2 issuer discovery
+client, err := v1beta2.NewInventoryGRPCClientBuilder().
+    WithEndpoint("secure.example.com:9000").
+    WithOAuth2Issuer("client-id", "client-secret", "https://auth.example.com", "read", "write").
+    Build()
+
+// Client with custom TLS and dial options
+client, err := v1beta2.NewInventoryGRPCClientBuilder().
+    WithEndpoint("secure.example.com:9000").
+    WithTLSConfig(&tls.Config{ServerName: "secure.example.com"}).
+    WithDialOption(grpc.WithKeepaliveParams(keepalive.ClientParameters{
+        Time:                10 * time.Second,
+        Timeout:             time.Second,
+        PermitWithoutStream: true,
+    })).
+    Build()
+```
 
 ## Error Handling
 
