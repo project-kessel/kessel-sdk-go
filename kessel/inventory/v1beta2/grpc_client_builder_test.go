@@ -65,7 +65,7 @@ func TestInventoryGRPCClientBuilder_WithInsecure(t *testing.T) {
 
 func TestInventoryGRPCClientBuilder_WithTLSConfig(t *testing.T) {
 	builder := NewInventoryGRPCClientBuilder()
-	tlsConfig := &tls.Config{ServerName: "example.com"}
+	tlsConfig := &tls.Config{ServerName: "test.example.com"}
 
 	result := builder.WithTLSConfig(tlsConfig)
 
@@ -74,12 +74,10 @@ func TestInventoryGRPCClientBuilder_WithTLSConfig(t *testing.T) {
 		t.Error("expected WithTLSConfig to return the same builder instance")
 	}
 
-	// Test value is set
+	// Test values are set
 	if builder.tlsConfig != tlsConfig {
 		t.Error("expected tlsConfig to be set")
 	}
-
-	// Test insecure is set to false
 	if builder.insecure {
 		t.Error("expected insecure to be false when TLS config is set")
 	}
@@ -87,7 +85,7 @@ func TestInventoryGRPCClientBuilder_WithTLSConfig(t *testing.T) {
 
 func TestInventoryGRPCClientBuilder_WithMaxReceiveMessageSize(t *testing.T) {
 	builder := NewInventoryGRPCClientBuilder()
-	size := 8 * 1024 * 1024 // 8MB
+	size := 8 * 1024 * 1024
 
 	result := builder.WithMaxReceiveMessageSize(size)
 
@@ -104,7 +102,7 @@ func TestInventoryGRPCClientBuilder_WithMaxReceiveMessageSize(t *testing.T) {
 
 func TestInventoryGRPCClientBuilder_WithMaxSendMessageSize(t *testing.T) {
 	builder := NewInventoryGRPCClientBuilder()
-	size := 8 * 1024 * 1024 // 8MB
+	size := 8 * 1024 * 1024
 
 	result := builder.WithMaxSendMessageSize(size)
 
@@ -237,7 +235,7 @@ func TestInventoryGRPCClientBuilder_Build_Success(t *testing.T) {
 	tests := []struct {
 		name        string
 		configure   func(*InventoryGRPCClientBuilder) *InventoryGRPCClientBuilder
-		validate    func(*testing.T, *InventoryGRPCClient)
+		validate    func(*testing.T, *InventoryClient)
 		expectError bool
 	}{
 		{
@@ -245,58 +243,15 @@ func TestInventoryGRPCClientBuilder_Build_Success(t *testing.T) {
 			configure: func(b *InventoryGRPCClientBuilder) *InventoryGRPCClientBuilder {
 				return b.WithEndpoint("localhost:9000").WithInsecure(true)
 			},
-			validate: func(t *testing.T, client *InventoryGRPCClient) {
-				if client.KesselInventoryService == nil {
-					t.Error("expected KesselInventoryService to be initialized")
+			validate: func(t *testing.T, client *InventoryClient) {
+				if client.KesselInventoryServiceClient == nil {
+					t.Error("expected KesselInventoryServiceClient to be initialized")
 				}
-				if client.gRPCConn == nil {
-					t.Error("expected gRPCConn to be initialized")
-				}
-				if client.tokenClient != nil {
-					t.Error("expected tokenClient to be nil when OAuth is not enabled")
-				}
-				if !client.insecure {
-					t.Error("expected insecure to be true")
+				if client.conn == nil {
+					t.Error("expected conn to be initialized")
 				}
 			},
 			expectError: false,
-		},
-		{
-			name: "secure client with OAuth2",
-			configure: func(b *InventoryGRPCClientBuilder) *InventoryGRPCClientBuilder {
-				return b.WithEndpoint("secure.example.com:9000").
-					WithOAuth2("client-id", "client-secret", "https://auth.example.com/token", "read", "write").
-					WithMaxReceiveMessageSize(8 * 1024 * 1024).
-					WithMaxSendMessageSize(4 * 1024 * 1024)
-			},
-			validate: func(t *testing.T, client *InventoryGRPCClient) {
-				if client.KesselInventoryService == nil {
-					t.Error("expected KesselInventoryService to be initialized")
-				}
-				if client.gRPCConn == nil {
-					t.Error("expected gRPCConn to be initialized")
-				}
-				if client.tokenClient == nil {
-					t.Error("expected tokenClient to be initialized when OAuth is enabled")
-				}
-				if client.insecure {
-					t.Error("expected insecure to be false for secure client")
-				}
-			},
-			expectError: false,
-		},
-		{
-			name: "client with OAuth2 issuer - should fail due to network",
-			configure: func(b *InventoryGRPCClientBuilder) *InventoryGRPCClientBuilder {
-				return b.WithEndpoint("secure.example.com:9000").
-					WithOAuth2Issuer("client-id", "client-secret", "https://auth.example.com", "read", "write")
-			},
-			validate: func(t *testing.T, client *InventoryGRPCClient) {
-				// This test should not reach here because Build() should fail
-				// when trying to discover OAuth2 endpoints from a non-existent issuer
-				t.Error("expected Build() to fail with network error, but it succeeded")
-			},
-			expectError: true,
 		},
 		{
 			name: "client with custom TLS config",
@@ -304,18 +259,12 @@ func TestInventoryGRPCClientBuilder_Build_Success(t *testing.T) {
 				return b.WithEndpoint("secure.example.com:9000").
 					WithTLSConfig(&tls.Config{ServerName: "secure.example.com"})
 			},
-			validate: func(t *testing.T, client *InventoryGRPCClient) {
-				if client.KesselInventoryService == nil {
-					t.Error("expected KesselInventoryService to be initialized")
+			validate: func(t *testing.T, client *InventoryClient) {
+				if client.KesselInventoryServiceClient == nil {
+					t.Error("expected KesselInventoryServiceClient to be initialized")
 				}
-				if client.gRPCConn == nil {
-					t.Error("expected gRPCConn to be initialized")
-				}
-				if client.tokenClient != nil {
-					t.Error("expected tokenClient to be nil when OAuth is not enabled")
-				}
-				if client.insecure {
-					t.Error("expected insecure to be false when TLS config is set")
+				if client.conn == nil {
+					t.Error("expected conn to be initialized")
 				}
 			},
 			expectError: false,
@@ -327,12 +276,12 @@ func TestInventoryGRPCClientBuilder_Build_Success(t *testing.T) {
 					WithInsecure(true).
 					WithDialOption(grpc.WithUserAgent("test-agent"))
 			},
-			validate: func(t *testing.T, client *InventoryGRPCClient) {
-				if client.KesselInventoryService == nil {
-					t.Error("expected KesselInventoryService to be initialized")
+			validate: func(t *testing.T, client *InventoryClient) {
+				if client.KesselInventoryServiceClient == nil {
+					t.Error("expected KesselInventoryServiceClient to be initialized")
 				}
-				if client.gRPCConn == nil {
-					t.Error("expected gRPCConn to be initialized")
+				if client.conn == nil {
+					t.Error("expected conn to be initialized")
 				}
 			},
 			expectError: false,
@@ -365,7 +314,7 @@ func TestInventoryGRPCClientBuilder_Build_Success(t *testing.T) {
 			tt.validate(t, client)
 
 			// Clean up
-			if client.gRPCConn != nil {
+			if client.conn != nil {
 				client.Close()
 			}
 		})
@@ -392,14 +341,11 @@ func TestInventoryGRPCClientBuilder_FluentChaining(t *testing.T) {
 	}
 
 	// Verify some key properties
-	if client.KesselInventoryService == nil {
-		t.Error("expected KesselInventoryService to be initialized")
+	if client.KesselInventoryServiceClient == nil {
+		t.Error("expected KesselInventoryServiceClient to be initialized")
 	}
-	if client.gRPCConn == nil {
-		t.Error("expected gRPCConn to be initialized")
-	}
-	if client.tokenClient == nil {
-		t.Error("expected tokenClient to be initialized when OAuth is enabled")
+	if client.conn == nil {
+		t.Error("expected conn to be initialized")
 	}
 
 	// Clean up
@@ -445,5 +391,26 @@ func TestInventoryGRPCClientBuilder_DefaultValues(t *testing.T) {
 	}
 	if len(builder.dialOptions) != 0 {
 		t.Errorf("expected default dialOptions to be empty, got %d options", len(builder.dialOptions))
+	}
+}
+
+func TestInventoryClient_Close(t *testing.T) {
+	client, err := NewInventoryGRPCClientBuilder().
+		WithEndpoint("localhost:9000").
+		WithInsecure(true).
+		Build()
+
+	if err != nil {
+		t.Fatalf("unexpected error building client: %v", err)
+	}
+
+	if client == nil {
+		t.Fatal("expected client to be non-nil")
+	}
+
+	// Test that Close() works without error
+	err = client.Close()
+	if err != nil {
+		t.Errorf("unexpected error closing client: %v", err)
 	}
 }

@@ -1,7 +1,6 @@
 package v1beta2
 
 import (
-	"context"
 	"crypto/tls"
 	"fmt"
 
@@ -12,12 +11,15 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
-// InventoryGRPCClient represents a gRPC client for the Kessel Inventory service
-type InventoryGRPCClient struct {
-	KesselInventoryService KesselInventoryServiceClient
-	gRPCConn               *grpc.ClientConn
-	tokenClient            *auth.TokenSource
-	insecure               bool
+// InventoryClient represents a simple wrapper around the gRPC client with connection lifecycle management
+type InventoryClient struct {
+	KesselInventoryServiceClient
+	conn *grpc.ClientConn
+}
+
+// Close closes the underlying gRPC connection
+func (c *InventoryClient) Close() error {
+	return c.conn.Close()
 }
 
 // InventoryGRPCClientBuilder provides a fluent interface for building gRPC clients
@@ -102,8 +104,8 @@ func (b *InventoryGRPCClientBuilder) WithDialOption(opt grpc.DialOption) *Invent
 	return b
 }
 
-// Build creates the final InventoryGRPCClient with the configured options
-func (b *InventoryGRPCClientBuilder) Build() (*InventoryGRPCClient, error) {
+// Build creates the final InventoryClient with the configured options
+func (b *InventoryGRPCClientBuilder) Build() (*InventoryClient, error) {
 	if b.endpoint == "" {
 		return nil, fmt.Errorf("endpoint is required")
 	}
@@ -126,14 +128,7 @@ func (b *InventoryGRPCClientBuilder) Build() (*InventoryGRPCClient, error) {
 		opts = append(opts, grpc.WithTransportCredentials(credentials.NewTLS(tlsConfig)))
 	}
 
-	// Add default call options for message sizes
-	opts = append(opts, grpc.WithDefaultCallOptions(
-		grpc.MaxCallRecvMsgSize(b.maxReceiveMessageSize),
-		grpc.MaxCallSendMsgSize(b.maxSendMessageSize),
-	))
-
-	// Create OAuth token client if enabled
-	var tokenClient *auth.TokenSource
+	// Add OAuth2 credentials directly to connection if enabled
 	if b.enableOAuth {
 		cfg := &config.GRPCConfig{
 			BaseConfig: config.BaseConfig{
@@ -153,12 +148,24 @@ func (b *InventoryGRPCClientBuilder) Build() (*InventoryGRPCClient, error) {
 			MaxSendMessageSize:    b.maxSendMessageSize,
 		}
 
-		var err error
-		tokenClient, err = auth.NewTokenSource(cfg)
+		tokenClient, err := auth.NewTokenSource(cfg)
 		if err != nil {
 			return nil, fmt.Errorf("failed to create token source: %w", err)
 		}
+
+		// Add per-RPC credentials for automatic token injection
+		if b.insecure {
+			opts = append(opts, grpc.WithPerRPCCredentials(tokenClient.GetInsecureGRPCCredentials()))
+		} else {
+			opts = append(opts, grpc.WithPerRPCCredentials(tokenClient.GetGRPCCredentials()))
+		}
 	}
+
+	// Add default call options for message sizes
+	opts = append(opts, grpc.WithDefaultCallOptions(
+		grpc.MaxCallRecvMsgSize(b.maxReceiveMessageSize),
+		grpc.MaxCallSendMsgSize(b.maxSendMessageSize),
+	))
 
 	// Create gRPC connection
 	conn, err := grpc.NewClient(b.endpoint, opts...)
@@ -166,75 +173,8 @@ func (b *InventoryGRPCClientBuilder) Build() (*InventoryGRPCClient, error) {
 		return nil, fmt.Errorf("failed to create gRPC connection: %w", err)
 	}
 
-	return &InventoryGRPCClient{
-		KesselInventoryService: NewKesselInventoryServiceClient(conn),
-		gRPCConn:               conn,
-		tokenClient:            tokenClient,
-		insecure:               b.insecure,
+	return &InventoryClient{
+		KesselInventoryServiceClient: NewKesselInventoryServiceClient(conn),
+		conn:                         conn,
 	}, nil
-}
-
-// Close closes the gRPC connection
-func (c *InventoryGRPCClient) Close() error {
-	return c.gRPCConn.Close()
-}
-
-// GetCallOptions returns call options with OAuth2 credentials if configured
-func (c *InventoryGRPCClient) GetCallOptions() []grpc.CallOption {
-	if c.tokenClient == nil {
-		return nil
-	}
-	return []grpc.CallOption{c.tokenClient.GetCallOption()}
-}
-
-// GetInsecureCallOptions returns call options with OAuth2 credentials for insecure connections
-func (c *InventoryGRPCClient) GetInsecureCallOptions() []grpc.CallOption {
-	if c.tokenClient == nil {
-		return nil
-	}
-	return []grpc.CallOption{c.tokenClient.GetInsecureCallOption()}
-}
-
-// GetTokenCallOption returns call options with explicit token handling
-func (c *InventoryGRPCClient) GetTokenCallOption() ([]grpc.CallOption, error) {
-	if c.tokenClient == nil {
-		return nil, nil
-	}
-
-	var opts []grpc.CallOption
-	token, err := c.tokenClient.GetToken(context.Background())
-	if err != nil {
-		return nil, err
-	}
-
-	// Create per-RPC credentials with the token
-	if c.insecure {
-		opts = append(opts, grpc.PerRPCCredentials(&bearerToken{
-			token:    token.AccessToken,
-			insecure: true,
-		}))
-	} else {
-		opts = append(opts, grpc.PerRPCCredentials(&bearerToken{
-			token:    token.AccessToken,
-			insecure: false,
-		}))
-	}
-
-	return opts, nil
-}
-
-// bearerToken implements credentials.PerRPCCredentials for bearer token authentication
-type bearerToken struct {
-	token    string
-	insecure bool
-}
-
-func (b *bearerToken) GetRequestMetadata(ctx context.Context, uri ...string) (map[string]string, error) {
-	return map[string]string{
-		"authorization": fmt.Sprintf("Bearer %s", b.token),
-	}, nil
-}
-
-func (b *bearerToken) RequireTransportSecurity() bool {
-	return !b.insecure
 }

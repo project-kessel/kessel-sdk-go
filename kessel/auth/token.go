@@ -157,6 +157,13 @@ func (ts *TokenSource) GetGRPCCredentials() credentials.PerRPCCredentials {
 	return oauth.TokenSource{TokenSource: ts.source}
 }
 
+// GetInsecureGRPCCredentials returns gRPC credentials for OAuth2 authentication that don't require transport security
+func (ts *TokenSource) GetInsecureGRPCCredentials() credentials.PerRPCCredentials {
+	return &insecureOAuthCreds{
+		tokenSource: ts.source,
+	}
+}
+
 // GetCallOption returns a gRPC call option with OAuth2 credentials
 func (ts *TokenSource) GetCallOption() grpc.CallOption {
 	return grpc.PerRPCCredentials(ts.GetGRPCCredentials())
@@ -165,9 +172,7 @@ func (ts *TokenSource) GetCallOption() grpc.CallOption {
 // GetInsecureCallOption returns a gRPC call option with OAuth2 credentials for insecure connections
 func (ts *TokenSource) GetInsecureCallOption() grpc.CallOption {
 	// For insecure connections, we create a custom credentials that doesn't require transport security
-	return grpc.PerRPCCredentials(&insecureOAuthCreds{
-		tokenSource: ts.source,
-	})
+	return grpc.PerRPCCredentials(ts.GetInsecureGRPCCredentials())
 }
 
 // insecureOAuthCreds implements credentials.PerRPCCredentials for insecure connections

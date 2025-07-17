@@ -1,12 +1,11 @@
 # Kessel SDK for Go
 
-
 The official Go SDK for the Kessel inventory and authorization service. This SDK provides gRPC client implementation with built-in OAuth2 support for secure authentication.
 
 ## Features
 
 - **gRPC client support** - High-performance gRPC communication
-- **OAuth2 authentication** - Built-in support with token refresh and caching
+- **OAuth2 authentication** - Built-in support with automatic token injection
 - **Flexible configuration** - Direct token URL or issuer-based discovery
 - **Type-safe API** - Generated from protobuf definitions
 - **Comprehensive error handling** - Rich error types with gRPC status codes
@@ -29,7 +28,6 @@ import (
     "context"
     "log"
 
-    inventoryapi "github.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2"
     v1beta2 "github.com/project-kessel/kessel-sdk-go/kessel/inventory/v1beta2"
 )
 
@@ -47,24 +45,22 @@ func main() {
     }
     defer client.Close()
 
-    // Make API call
-    request := &inventoryapi.CheckRequest{
-        Object: &inventoryapi.ResourceReference{
+    // Make API call - OAuth2 tokens are automatically injected!
+    request := &v1beta2.CheckRequest{
+        Object: &v1beta2.ResourceReference{
             ResourceType: "host",
             ResourceId:   "server-123",
         },
         Relation: "member",
-        Subject: &inventoryapi.SubjectReference{
-            Resource: &inventoryapi.ResourceReference{
+        Subject: &v1beta2.SubjectReference{
+            Resource: &v1beta2.ResourceReference{
                 ResourceType: "user",
                 ResourceId:   "alice",
             },
         },
     }
 
-    // Get call options with OAuth2 token
-    callOpts := client.GetCallOptions()
-    response, err := client.KesselInventoryService.Check(context.Background(), request, callOpts...)
+    response, err := client.Check(context.Background(), request)
     if err != nil {
         log.Fatal(err)
     }
@@ -72,8 +68,6 @@ func main() {
     log.Printf("Check result: %v", response.Allowed)
 }
 ```
-
-
 
 ## Configuration
 
@@ -86,11 +80,10 @@ The SDK supports two OAuth2 configuration approaches:
 Specify the exact OAuth2 token endpoint:
 
 ```go
-config.WithGRPCOAuth2(
-    "client-id",
-    "client-secret", 
-    "https://auth.example.com/oauth/token",
-)
+client, err := v1beta2.NewInventoryGRPCClientBuilder().
+    WithEndpoint("your-server:9000").
+    WithOAuth2("client-id", "client-secret", "https://auth.example.com/oauth/token").
+    Build()
 ```
 
 #### 2. Issuer-Based Discovery
@@ -98,11 +91,10 @@ config.WithGRPCOAuth2(
 Provide the issuer URL for automatic endpoint discovery via OpenID Connect:
 
 ```go
-config.WithGRPCOAuth2Issuer(
-    "client-id",
-    "client-secret",
-    "https://auth.example.com", // Will discover token endpoint automatically
-)
+client, err := v1beta2.NewInventoryGRPCClientBuilder().
+    WithEndpoint("your-server:9000").
+    WithOAuth2Issuer("client-id", "client-secret", "https://auth.example.com"). // Will discover token endpoint automatically
+    Build()
 ```
 
 ### Keycloak Example
@@ -110,49 +102,57 @@ config.WithGRPCOAuth2Issuer(
 For Keycloak authentication:
 
 ```go
-config.WithGRPCOAuth2Issuer(
-    "your-service-account",
-    "your-client-secret",
-    "http://localhost:8085/realms/your-realm",
-)
+client, err := v1beta2.NewInventoryGRPCClientBuilder().
+    WithEndpoint("your-server:9000").
+    WithOAuth2Issuer("your-service-account", "your-client-secret", "http://localhost:8085/realms/your-realm").
+    Build()
 ```
 
 ### TLS Configuration
 
 ```go
 // Secure connection (default)
-config.WithGRPCEndpoint("your-server:9000")
+client, err := v1beta2.NewInventoryGRPCClientBuilder().
+    WithEndpoint("your-server:9000").
+    Build()
 
 // Insecure connection (development only)
-config.WithGRPCInsecure(true)
+client, err := v1beta2.NewInventoryGRPCClientBuilder().
+    WithEndpoint("your-server:9000").
+    WithInsecure(true).
+    Build()
 
 // Custom TLS configuration
 tlsConfig := &tls.Config{
     ServerName: "your-server.com",
 }
-config.WithGRPCTLSConfig(tlsConfig)
+client, err := v1beta2.NewInventoryGRPCClientBuilder().
+    WithEndpoint("your-server:9000").
+    WithTLSConfig(tlsConfig).
+    Build()
 ```
 
 ## API Reference
 
 ### Client Types
 
-- `InventoryGRPCClient` - gRPC client for the Kessel Inventory service
+- `InventoryClient` - Simple wrapper around the gRPC client with connection lifecycle management
 
-### Authentication Methods
+### Automatic Authentication
 
-The client provides multiple ways to handle OAuth2 tokens:
-
-#### Explicit Token Handling
+OAuth2 tokens are automatically injected into all requests when configured. No manual token management is required:
 
 ```go
-// Manual token retrieval and injection
-tokenOpts, err := client.GetTokenCallOption()
-if err != nil {
-    return err
-}
+// Configure OAuth2 once during client creation
+client, err := v1beta2.NewInventoryGRPCClientBuilder().
+    WithEndpoint("your-server:9000").
+    WithOAuth2("client-id", "client-secret", "https://auth.example.com/token").
+    Build()
 
-response, err := client.KesselInventoryService.Check(ctx, request, tokenOpts...)
+// All subsequent calls automatically include OAuth2 tokens
+response, err := client.Check(ctx, request)
+response, err := client.ReportResource(ctx, reportRequest)
+response, err := client.DeleteResource(ctx, deleteRequest)
 ```
 
 ### Configuration Options
@@ -210,7 +210,11 @@ The SDK provides rich error types for different failure scenarios:
 ```go
 import "github.com/project-kessel/kessel-sdk-go/kessel/errors"
 
-client, err := v1beta2.NewInventoryGRPCClient(cfg)
+client, err := v1beta2.NewInventoryGRPCClientBuilder().
+    WithEndpoint("your-server:9000").
+    WithOAuth2("client-id", "client-secret", "https://auth.example.com/token").
+    Build()
+
 if err != nil {
     if errors.IsConnectionError(err) {
         log.Fatal("Failed to connect to server:", err)
@@ -274,47 +278,3 @@ make test-coverage
 | Target | Description |
 |--------|-------------|
 | `make help` | Display all available targets |
-| `make lint` | Run golangci-lint |
-| `make test` | Run all tests |
-| `make test-coverage` | Run tests with coverage report |
-| `make build` | Build example binaries |
-| `make clean` | Clean build artifacts |
-| `make fmt` | Format Go code |
-| `make mod-tidy` | Run go mod tidy |
-| `make generate` | Generate protobuf files |
-
-### Code Generation
-
-The SDK uses Protocol Buffers for type definitions. To regenerate code:
-
-```bash
-make generate
-```
-
-This requires:
-- [buf](https://buf.build/docs/installation) CLI tool
-- Protocol Buffer compiler plugins
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Make your changes
-4. Run tests and linting (`make test lint`)
-5. Commit your changes (`git commit -m 'Add amazing feature'`)
-6. Push to the branch (`git push origin feature/amazing-feature`)
-7. Open a Pull Request
-
-### Code Style
-
-- Follow standard Go conventions
-- Run `make fmt` to format code
-- Ensure `make lint` passes without errors
-- Add tests for new functionality
-- Update documentation as needed
-
-## License
-
-This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
-
-

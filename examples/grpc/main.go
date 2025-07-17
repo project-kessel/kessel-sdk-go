@@ -22,7 +22,7 @@ func main() {
 		WithInsecure(true).
 		WithOAuth2Issuer("svc-test", "h91qw8bPiDj9R6VSORsI5TYbceGU5PMH", "http://localhost:8085/realms/redhat-external").
 		WithMaxReceiveMessageSize(8 * 1024 * 1024). // 8MB
-		WithMaxSendMessageSize(8 * 1024 * 1024).    // 8MB
+		WithMaxSendMessageSize(8 * 1024 * 1024). // 8MB
 		Build()
 
 	if err != nil {
@@ -59,44 +59,28 @@ func main() {
 		},
 	}
 
-	// Get call options using explicit token handling
-	tokenOpts, err := inventoryClient.GetTokenCallOption()
-	if err != nil {
-		fmt.Printf("Failed to get token call options: %v\n", err)
-		return
-	}
-	fmt.Println("\nUsing explicit token handling:")
-	response2, err := inventoryClient.KesselInventoryService.Check(ctx, checkRequest, tokenOpts...)
+	// OAuth2 tokens are automatically injected - no manual token management needed!
+	fmt.Println("Making request with automatic OAuth2 token injection:")
+	response, err := inventoryClient.Check(ctx, checkRequest)
 	if err != nil {
 		fmt.Printf("Request failed with error: %v\n", err)
 		return
 	}
-	fmt.Printf("Check response: %+v\n", response2)
-
-	// Method : Get call options using built-in token source integration
-	// Doesn't work with Keycloak
-	// HTTP Request to /kessel.inventory.v1beta2.KesselInventoryService/Check failed, error id: 398c029e-cf41-4b6e-844a-0e411a11df79-1: io.vertx.core.http.StreamResetException: Stream reset: 8
-	//callOpts := inventoryClient.GetCallOptions()
-	//fmt.Println("Using built-in token source integration:")
-	//response, err := inventoryClient.KesselInventoryService.Check(ctx, checkRequest, callOpts...)
-	//if err != nil {
-	//	fmt.Printf("Request failed with error: %v\n", err)
-	//	return
-	//}
-	//fmt.Printf("Check response: %+v\n", response)
+	fmt.Printf("Check response: %+v\n", response)
 }
 
 // Example showing different builder configurations
 func demonstrateBuilderOptions() {
 	ctx := context.Background()
 
-	// Example 1: Basic insecure client
+	// Example 1: Basic insecure client (no OAuth)
 	client1, err := v1beta2.NewInventoryGRPCClientBuilder().
 		WithEndpoint("localhost:9000").
 		WithInsecure(true).
 		Build()
 	if err != nil {
 		log.Printf("Failed to create basic client: %v", err)
+		return
 	}
 	defer client1.Close()
 
@@ -105,10 +89,11 @@ func demonstrateBuilderOptions() {
 		WithEndpoint("secure.example.com:9000").
 		WithOAuth2("client-id", "client-secret", "https://auth.example.com/token").
 		WithMaxReceiveMessageSize(16 * 1024 * 1024). // 16MB
-		WithMaxSendMessageSize(4 * 1024 * 1024).     // 4MB
+		WithMaxSendMessageSize(4 * 1024 * 1024). // 4MB
 		Build()
 	if err != nil {
 		log.Printf("Failed to create secure client: %v", err)
+		return
 	}
 	defer client2.Close()
 
@@ -119,9 +104,44 @@ func demonstrateBuilderOptions() {
 		Build()
 	if err != nil {
 		log.Printf("Failed to create TLS client: %v", err)
+		return
 	}
 	defer client3.Close()
 
-	// Use the clients...
-	_ = ctx
+	// Use the clients directly - tokens are automatically injected
+	request := &v1beta2.CheckRequest{
+		Object: &v1beta2.ResourceReference{
+			ResourceType: "host",
+			ResourceId:   "server-123",
+		},
+		Relation: "member",
+		Subject: &v1beta2.SubjectReference{
+			Resource: &v1beta2.ResourceReference{
+				ResourceType: "user",
+				ResourceId:   "alice",
+			},
+		},
+	}
+
+	// All clients work the same way - just call the methods directly
+	response1, err := client1.Check(ctx, request)
+	if err != nil {
+		log.Printf("Client 1 failed: %v", err)
+	} else {
+		log.Printf("Client 1 response: %+v", response1)
+	}
+
+	response2, err := client2.Check(ctx, request)
+	if err != nil {
+		log.Printf("Client 2 failed: %v", err)
+	} else {
+		log.Printf("Client 2 response: %+v", response2)
+	}
+
+	response3, err := client3.Check(ctx, request)
+	if err != nil {
+		log.Printf("Client 3 failed: %v", err)
+	} else {
+		log.Printf("Client 3 response: %+v", response3)
+	}
 }
