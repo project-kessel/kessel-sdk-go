@@ -4,7 +4,7 @@ inputs:
   - module: buf.build/bufbuild/protovalidate
   - module: buf.build/googleapis/googleapis
 plugins:
-  - remote: buf.build/protocolbuffers/go
+  - remote: buf.build/protocolbuffers/go:v1.36.6
     out: .
     opt:
       - paths=source_relative
