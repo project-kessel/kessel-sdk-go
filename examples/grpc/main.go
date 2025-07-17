@@ -22,7 +22,7 @@ func main() {
 		WithInsecure(true).
 		WithOAuth2Issuer("svc-test", "h91qw8bPiDj9R6VSORsI5TYbceGU5PMH", "http://localhost:8085/realms/redhat-external").
 		WithMaxReceiveMessageSize(8 * 1024 * 1024). // 8MB
-		WithMaxSendMessageSize(8 * 1024 * 1024). // 8MB
+		WithMaxSendMessageSize(8 * 1024 * 1024).    // 8MB
 		Build()
 
 	if err != nil {
