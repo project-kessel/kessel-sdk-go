@@ -1,0 +1,5 @@
+version: v2
+deps:
+  - buf.build/project-kessel/inventory-api
+  - buf.build/bufbuild/protovalidate:v0.10.7
+  - buf.build/googleapis/googleapis:v0.10.0
