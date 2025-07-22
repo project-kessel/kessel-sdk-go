@@ -21,8 +21,6 @@ help: ## Display this help screen
 build: ## Build example binaries
 	@echo "Building gRPC example"
 	@go build -o bin/grpc-example examples/grpc/main.go
-	@echo "Building HTTP example"
-	@go build -o bin/http-example examples/http/http_example.go
 
 .PHONY: lint
 lint: ## Run golangci-lint
