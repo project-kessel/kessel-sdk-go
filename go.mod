@@ -1,6 +1,6 @@
 module github.com/project-kessel/kessel-sdk-go
 
-go 1.24.4
+go 1.23.0
 
 require (
 	buf.build/gen/go/bufbuild/protovalidate/protocolbuffers/go v1.36.6-20250613105001-9f2d3c737feb.1
