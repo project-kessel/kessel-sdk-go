@@ -21,20 +21,11 @@ func main() {
 	// 2. Issuer-based discovery: Provide the issuer URL and let the SDK discover
 	//    the token endpoint via OpenID Connect Discovery (/.well-known/openid_configuration)
 
-	grpcConfig := &config.GRPCConfig{
-		BaseConfig: config.BaseConfig{
-			Endpoint:    "127.0.0.1:9000",
-			Insecure:    true,
-			EnableOauth: true,
-			Oauth2: config.Oauth2{
-				ClientID:     "svc-test",
-				ClientSecret: "h91qw8bPiDj9R6VSORsI5TYbceGU5PMH",
-				IssuerURL:    "http://localhost:8085/realms/redhat-external",
-			},
-		},
-		MaxReceiveMessageSize: 8 * 1024 * 1024, // 8MB
-		MaxSendMessageSize:    8 * 1024 * 1024, // 8MB
-	}
+	grpcConfig := config.NewGRPCConfig(
+		config.WithGRPCEndpoint("127.0.0.1:9000"),
+		config.WithGRPCInsecure(true),
+		config.WithGRPCOAuth2Issuer("svc-test", "h91qw8bPiDj9R6VSORsI5TYbceGU5PMH", "http://localhost:8085/realms/redhat-external"),
+	)
 
 	// Create OAuth2 token source
 	tokenSource, err := auth.NewTokenSource(grpcConfig)

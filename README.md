@@ -38,20 +38,11 @@ import (
 
 func main() {
     ctx := context.Background()
-    grpcConfig := &config.GRPCConfig{
-        BaseConfig: config.BaseConfig{
-            Endpoint:    "127.0.0.1:9000",
-            Insecure:    true,
-            EnableOauth: true,
-            Oauth2: config.Oauth2{
-                ClientID:     "your-client-id",
-                ClientSecret: "your-client-secret",
-                IssuerURL:    "http://localhost:8085/realms/your-realm",
-            },
-        },
-        MaxReceiveMessageSize: 8 * 1024 * 1024, // 8MB
-        MaxSendMessageSize:    8 * 1024 * 1024, // 8MB
-    }
+    grpcConfig := config.NewGRPCConfig(
+		config.WithGRPCEndpoint("your-kessel-server:9000"),
+		config.WithGRPCInsecure(true),
+		config.WithGRPCOAuth2("your-client-id", "your-client-secret", "https://your-auth-server/token"),
+	)
 
     // Create OAuth2 token source
     tokenSource, err := auth.NewTokenSource(grpcConfig)
@@ -126,17 +117,11 @@ The SDK supports two OAuth2 configuration approaches:
 Specify the exact OAuth2 token endpoint:
 
 ```go
-grpcConfig := &config.GRPCConfig{
-    BaseConfig: config.BaseConfig{
-        Endpoint:    "your-server:9000",
-        EnableOauth: true,
-        Oauth2: config.Oauth2{
-            ClientID:     "your-client-id",
-            ClientSecret: "your-client-secret",
-            TokenURL:     "https://keycloak.example.com/realms/your-realm/protocol/openid-connect/token",
-        },
-    },
-}
+grpcConfig := config.NewGRPCConfig(
+    config.WithGRPCEndpoint("your-server:9000"),
+    config.WithGRPCInsecure(true),
+    config.WithGRPCOAuth2("your-client-id", "your-client-secret", "https://keycloak.example.com/realms/your-realm/protocol/openid-connect/token"),
+)
 ```
 
 #### 2. Issuer-Based Discovery
@@ -144,17 +129,11 @@ grpcConfig := &config.GRPCConfig{
 Provide the issuer URL for automatic endpoint discovery via OpenID Connect:
 
 ```go
-grpcConfig := &config.GRPCConfig{
-    BaseConfig: config.BaseConfig{
-        Endpoint:    "your-server:9000",
-        EnableOauth: true,
-        Oauth2: config.Oauth2{
-            ClientID:     "your-client-id",
-            ClientSecret: "your-client-secret",
-            IssuerURL:    "https://keycloak.example.com/realms/your-realm",
-        },
-    },
-}
+grpcConfig := config.NewGRPCConfig(
+    config.WithGRPCEndpoint("your-server:9000"),
+    config.WithGRPCInsecure(true),
+    config.WithGRPCOAuth2Issuer("your-client-id", "your-client-secret", "http://localhost:8085/realms/redhat-external"),
+)
 ```
 
 ## API Reference
