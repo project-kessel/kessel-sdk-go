@@ -28,25 +28,71 @@ import (
     "context"
     "log"
 
+    "github.com/project-kessel/kessel-sdk-go/kessel/config"
+    "github.com/project-kessel/kessel-sdk-go/kessel/errors"
+    "github.com/project-kessel/kessel-sdk-go/kessel/grpc/auth"
     v1beta2 "github.com/project-kessel/kessel-sdk-go/kessel/inventory/v1beta2"
+    "google.golang.org/grpc"
+    "google.golang.org/grpc/credentials/insecure"
 )
 
 func main() {
-    // Create client using fluent builder pattern
-    client, err := v1beta2.NewInventoryGRPCClientBuilder().
-        WithEndpoint("your-kessel-server:9000").
-        WithOAuth2("your-client-id", "your-client-secret", "https://your-auth-server/token").
-        WithMaxReceiveMessageSize(8 * 1024 * 1024). // 8MB
-        WithMaxSendMessageSize(4 * 1024 * 1024).    // 4MB
-        Build()
-    
-    if err != nil {
-        log.Fatal(err)
+    ctx := context.Background()
+    grpcConfig := &config.GRPCConfig{
+        BaseConfig: config.BaseConfig{
+            Endpoint:    "127.0.0.1:9000",
+            Insecure:    true,
+            EnableOauth: true,
+            Oauth2: config.Oauth2{
+                ClientID:     "your-client-id",
+                ClientSecret: "your-client-secret",
+                IssuerURL:    "http://localhost:8085/realms/your-realm",
+            },
+        },
+        MaxReceiveMessageSize: 8 * 1024 * 1024, // 8MB
+        MaxSendMessageSize:    8 * 1024 * 1024, // 8MB
     }
-    defer client.Close()
 
-    // Make API call - OAuth2 tokens are automatically injected!
-    request := &v1beta2.CheckRequest{
+    // Create OAuth2 token source
+    tokenSource, err := auth.NewTokenSource(grpcConfig)
+    if err != nil {
+        if errors.IsTokenError(err) {
+            log.Fatal("OAuth2 token configuration failed: ", err)
+        } else {
+            log.Fatal("Unknown auth error: ", err)
+        }
+    }
+
+    // Using insecure credentials for local development
+    var dialOpts []grpc.DialOption
+    dialOpts = append(dialOpts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+    dialOpts = append(dialOpts, grpc.WithPerRPCCredentials(tokenSource.GetInsecureGRPCCredentials()))
+    dialOpts = append(dialOpts,
+        grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcConfig.MaxReceiveMessageSize)),
+        grpc.WithDefaultCallOptions(grpc.MaxCallSendMsgSize(grpcConfig.MaxSendMessageSize)),
+    )
+
+    conn, err := grpc.NewClient(grpcConfig.Endpoint, dialOpts...)
+    if err != nil {
+        // Example of checking for specific error types using sentinel errors
+        if errors.IsConnectionError(err) {
+            log.Fatal("Failed to establish connection:", err)
+        } else if errors.IsTokenError(err) {
+            log.Fatal("OAuth2 token configuration failed:", err)
+        } else {
+            log.Fatal("Unknown error:", err)
+        }
+    }
+    defer func() {
+        if closeErr := conn.Close(); closeErr != nil {
+            log.Printf("Failed to close gRPC client: %v", closeErr)
+        }
+    }()
+
+    inventoryClient := v1beta2.NewKesselInventoryServiceClient(conn)
+
+    // Example request using the external API types
+    checkRequest := &v1beta2.CheckRequest{
         Object: &v1beta2.ResourceReference{
             ResourceType: "host",
             ResourceId:   "server-123",
@@ -80,10 +126,17 @@ The SDK supports two OAuth2 configuration approaches:
 Specify the exact OAuth2 token endpoint:
 
 ```go
-client, err := v1beta2.NewInventoryGRPCClientBuilder().
-    WithEndpoint("your-server:9000").
-    WithOAuth2("client-id", "client-secret", "https://auth.example.com/oauth/token").
-    Build()
+grpcConfig := &config.GRPCConfig{
+    BaseConfig: config.BaseConfig{
+        Endpoint:    "your-server:9000",
+        EnableOauth: true,
+        Oauth2: config.Oauth2{
+            ClientID:     "your-client-id",
+            ClientSecret: "your-client-secret",
+            TokenURL:     "https://keycloak.example.com/realms/your-realm/protocol/openid-connect/token",
+        },
+    },
+}
 ```
 
 #### 2. Issuer-Based Discovery
@@ -91,52 +144,20 @@ client, err := v1beta2.NewInventoryGRPCClientBuilder().
 Provide the issuer URL for automatic endpoint discovery via OpenID Connect:
 
 ```go
-client, err := v1beta2.NewInventoryGRPCClientBuilder().
-    WithEndpoint("your-server:9000").
-    WithOAuth2Issuer("client-id", "client-secret", "https://auth.example.com"). // Will discover token endpoint automatically
-    Build()
-```
-
-### Keycloak Example
-
-For Keycloak authentication:
-
-```go
-client, err := v1beta2.NewInventoryGRPCClientBuilder().
-    WithEndpoint("your-server:9000").
-    WithOAuth2Issuer("your-service-account", "your-client-secret", "http://localhost:8085/realms/your-realm").
-    Build()
-```
-
-### TLS Configuration
-
-```go
-// Secure connection (default)
-client, err := v1beta2.NewInventoryGRPCClientBuilder().
-    WithEndpoint("your-server:9000").
-    Build()
-
-// Insecure connection (development only)
-client, err := v1beta2.NewInventoryGRPCClientBuilder().
-    WithEndpoint("your-server:9000").
-    WithInsecure(true).
-    Build()
-
-// Custom TLS configuration
-tlsConfig := &tls.Config{
-    ServerName: "your-server.com",
+grpcConfig := &config.GRPCConfig{
+    BaseConfig: config.BaseConfig{
+        Endpoint:    "your-server:9000",
+        EnableOauth: true,
+        Oauth2: config.Oauth2{
+            ClientID:     "your-client-id",
+            ClientSecret: "your-client-secret",
+            IssuerURL:    "https://keycloak.example.com/realms/your-realm",
+        },
+    },
 }
-client, err := v1beta2.NewInventoryGRPCClientBuilder().
-    WithEndpoint("your-server:9000").
-    WithTLSConfig(tlsConfig).
-    Build()
 ```
 
 ## API Reference
-
-### Client Types
-
-- `InventoryClient` - Simple wrapper around the gRPC client with connection lifecycle management
 
 ### Automatic Authentication
 
@@ -144,10 +165,6 @@ OAuth2 tokens are automatically injected into all requests when configured. No m
 
 ```go
 // Configure OAuth2 once during client creation
-client, err := v1beta2.NewInventoryGRPCClientBuilder().
-    WithEndpoint("your-server:9000").
-    WithOAuth2("client-id", "client-secret", "https://auth.example.com/token").
-    Build()
 
 // All subsequent calls automatically include OAuth2 tokens
 response, err := client.Check(ctx, request)
@@ -157,52 +174,6 @@ response, err := client.DeleteResource(ctx, deleteRequest)
 
 ### Configuration Options
 
-#### Fluent Builder Methods
-
-- `WithEndpoint(endpoint)` - Set server endpoint
-- `WithInsecure(bool)` - Enable/disable TLS
-- `WithTLSConfig(*tls.Config)` - Custom TLS configuration
-- `WithMaxReceiveMessageSize(int)` - Set max receive message size
-- `WithMaxSendMessageSize(int)` - Set max send message size
-- `WithOAuth2(clientID, secret, tokenURL, scopes...)` - OAuth2 with direct token URL
-- `WithOAuth2Issuer(clientID, secret, issuerURL, scopes...)` - OAuth2 with issuer discovery
-- `WithDialOption(grpc.DialOption)` - Add custom gRPC dial options
-
-```go
-// Example configurations using the fluent builder pattern:
-
-// Basic insecure client
-client, err := v1beta2.NewInventoryGRPCClientBuilder().
-    WithEndpoint("localhost:9000").
-    WithInsecure(true).
-    Build()
-
-// Secure client with OAuth2 and custom message sizes
-client, err := v1beta2.NewInventoryGRPCClientBuilder().
-    WithEndpoint("secure.example.com:9000").
-    WithOAuth2("client-id", "client-secret", "https://auth.example.com/token").
-    WithMaxReceiveMessageSize(16 * 1024 * 1024). // 16MB
-    WithMaxSendMessageSize(4 * 1024 * 1024).     // 4MB
-    Build()
-
-// Client with OAuth2 issuer discovery
-client, err := v1beta2.NewInventoryGRPCClientBuilder().
-    WithEndpoint("secure.example.com:9000").
-    WithOAuth2Issuer("client-id", "client-secret", "https://auth.example.com", "read", "write").
-    Build()
-
-// Client with custom TLS and dial options
-client, err := v1beta2.NewInventoryGRPCClientBuilder().
-    WithEndpoint("secure.example.com:9000").
-    WithTLSConfig(&tls.Config{ServerName: "secure.example.com"}).
-    WithDialOption(grpc.WithKeepaliveParams(keepalive.ClientParameters{
-        Time:                10 * time.Second,
-        Timeout:             time.Second,
-        PermitWithoutStream: true,
-    })).
-    Build()
-```
-
 ## Error Handling
 
 The SDK provides rich error types for different failure scenarios:
@@ -210,11 +181,18 @@ The SDK provides rich error types for different failure scenarios:
 ```go
 import "github.com/project-kessel/kessel-sdk-go/kessel/errors"
 
-client, err := v1beta2.NewInventoryGRPCClientBuilder().
-    WithEndpoint("your-server:9000").
-    WithOAuth2("client-id", "client-secret", "https://auth.example.com/token").
-    Build()
+tokenSource, err := auth.NewTokenSource(grpcConfig)
+if err != nil {
+    if errors.IsTokenError(err) {
+        // Handle OAuth2 authentication errors
+        log.Fatal("OAuth2 authentication failed:", err)
+    } else {
+        // Handle other errors
+        log.Fatal("Unknown error:", err)
+    }
+}
 
+conn, err := grpc.NewClient(endpoint, dialOpts...)
 if err != nil {
     if errors.IsConnectionError(err) {
         log.Fatal("Failed to connect to server:", err)
