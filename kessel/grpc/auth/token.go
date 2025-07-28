@@ -10,7 +10,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/project-kessel/kessel-sdk-go/kessel/config"
 	"github.com/project-kessel/kessel-sdk-go/kessel/errors"
 
 	"golang.org/x/oauth2"
@@ -23,8 +22,12 @@ import (
 
 // OAuthConfig interface for extracting OAuth configuration from different config types
 type OAuthConfig interface {
-	GetEnableOauth() bool
-	GetOauth2() config.Oauth2
+	GetEnableOIDCAuth() bool
+	GetClientID() string
+	GetClientSecret() string
+	GetTokenURL() string
+	GetIssuerURL() string
+	GetScopes() []string
 }
 
 // TokenSource wraps oauth2.TokenSource for easier testing and management
@@ -99,10 +102,7 @@ func discoverTokenEndpoint(ctx context.Context, issuerURL string) (string, error
 
 // NewTokenSource creates a new OAuth2 token source using client credentials flow
 func NewTokenSource(cfg OAuthConfig) (*TokenSource, error) {
-	oauth2Config := cfg.GetOauth2()
-
-	// Validate required fields
-	if oauth2Config.ClientID == "" || oauth2Config.ClientSecret == "" {
+	if cfg.GetClientID() == "" || cfg.GetClientSecret() == "" {
 		return nil, errors.New(errors.ErrTokenRetrieval,
 			codes.InvalidArgument,
 			"OAuth2 configuration incomplete: client_id and client_secret are required")
@@ -110,19 +110,19 @@ func NewTokenSource(cfg OAuthConfig) (*TokenSource, error) {
 
 	// Determine token URL - either from direct config or issuer discovery
 	var tokenURL string
-	if oauth2Config.TokenURL != "" {
+	if cfg.GetTokenURL() != "" {
 		// Use directly configured token URL
-		tokenURL = oauth2Config.TokenURL
-	} else if oauth2Config.IssuerURL != "" {
+		tokenURL = cfg.GetTokenURL()
+	} else if cfg.GetIssuerURL() != "" {
 		// Discover token endpoint from issuer
 		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
 
-		discoveredTokenURL, err := discoverTokenEndpoint(ctx, oauth2Config.IssuerURL)
+		discoveredTokenURL, err := discoverTokenEndpoint(ctx, cfg.GetIssuerURL())
 		if err != nil {
 			return nil, errors.New(errors.ErrTokenRetrieval,
 				codes.InvalidArgument,
-				fmt.Sprintf("failed to discover token endpoint from issuer %s: %v", oauth2Config.IssuerURL, err))
+				fmt.Sprintf("failed to discover token endpoint from issuer %s: %v", cfg.GetIssuerURL(), err))
 		}
 		tokenURL = discoveredTokenURL
 	} else {
@@ -132,10 +132,10 @@ func NewTokenSource(cfg OAuthConfig) (*TokenSource, error) {
 	}
 
 	clientCredConfig := &clientcredentials.Config{
-		ClientID:     oauth2Config.ClientID,
-		ClientSecret: oauth2Config.ClientSecret,
+		ClientID:     cfg.GetClientID(),
+		ClientSecret: cfg.GetClientSecret(),
 		TokenURL:     tokenURL,
-		Scopes:       oauth2Config.Scopes,
+		Scopes:       cfg.GetScopes(),
 	}
 
 	return &TokenSource{

@@ -8,7 +8,7 @@ import (
 
 func TestNewGRPCConfig_Basic(t *testing.T) {
 	// Test basic configuration creation
-	cfg := NewGRPCConfig()
+	cfg := NewCompatibilityConfig()
 
 	// Verify defaults are set correctly
 	if cfg.Insecure {
@@ -24,40 +24,40 @@ func TestNewGRPCConfig_Basic(t *testing.T) {
 
 func TestNewGRPCConfig_WithOptions(t *testing.T) {
 	// Test configuration with multiple options
-	cfg := NewGRPCConfig(
+	cfg := NewCompatibilityConfig(
 		WithGRPCEndpoint("localhost:8080"),
 		WithGRPCInsecure(true),
 		WithGRPCOAuth2("client-id", "client-secret", "https://auth.example.com/token", "scope1", "scope2"),
 	)
 
 	// Verify all options were applied
-	if cfg.Endpoint != "localhost:8080" {
-		t.Errorf("expected Endpoint to be 'localhost:8080', got %q", cfg.Endpoint)
+	if cfg.Url != "localhost:8080" {
+		t.Errorf("expected Endpoint to be 'localhost:8080', got %q", cfg.Url)
 	}
 	if !cfg.Insecure {
 		t.Error("expected Insecure to be true")
 	}
-	if !cfg.EnableOauth {
-		t.Error("expected EnableOauth to be true")
+	if !cfg.EnableOIDCAuth {
+		t.Error("expected EnableOIDCAuth to be true")
 	}
-	if cfg.Oauth2.ClientID != "client-id" {
-		t.Errorf("expected ClientID to be 'client-id', got %q", cfg.Oauth2.ClientID)
+	if cfg.ClientID != "client-id" {
+		t.Errorf("expected ClientID to be 'client-id', got %q", cfg.ClientID)
 	}
-	if len(cfg.Oauth2.Scopes) != 2 {
-		t.Errorf("expected 2 scopes, got %d", len(cfg.Oauth2.Scopes))
+	if len(cfg.Scopes) != 2 {
+		t.Errorf("expected 2 scopes, got %d", len(cfg.Scopes))
 	}
 }
 
 func TestOauth2_DiscoverTokenEndpoint_ErrorHandling(t *testing.T) {
 	tests := []struct {
 		name        string
-		oauth2      *Oauth2
+		oauth2      *CompatibilityConfig
 		expectError bool
 		errorMsg    string
 	}{
 		{
 			name: "missing issuer URL",
-			oauth2: &Oauth2{
+			oauth2: &CompatibilityConfig{
 				ClientID:     "test-client",
 				ClientSecret: "test-secret",
 			},
@@ -66,7 +66,7 @@ func TestOauth2_DiscoverTokenEndpoint_ErrorHandling(t *testing.T) {
 		},
 		{
 			name: "invalid issuer URL",
-			oauth2: &Oauth2{
+			oauth2: &CompatibilityConfig{
 				ClientID:     "test-client",
 				ClientSecret: "test-secret",
 				IssuerURL:    "https://invalid-issuer.example.com",

@@ -9,15 +9,11 @@ import (
 
 func TestTokenSource_IssuerDiscovery(t *testing.T) {
 	// Test that issuer discovery fails with fake URL (this tests our custom logic)
-	cfg := &config.GRPCConfig{
-		BaseConfig: config.BaseConfig{
-			EnableOauth: true,
-			Oauth2: config.Oauth2{
-				ClientID:     "test-client",
-				ClientSecret: "test-secret",
-				IssuerURL:    "https://fake-issuer.example.com",
-			},
-		},
+	cfg := &config.CompatibilityConfig{
+		EnableOIDCAuth: true,
+		ClientID:       "test-client",
+		ClientSecret:   "test-secret",
+		IssuerURL:      "https://fake-issuer.example.com",
 	}
 
 	_, err := NewTokenSource(cfg)
@@ -32,16 +28,12 @@ func TestTokenSource_IssuerDiscovery(t *testing.T) {
 
 func TestTokenSource_TokenURLPrecedence(t *testing.T) {
 	// Test that TokenURL takes precedence over IssuerURL
-	cfg := &config.GRPCConfig{
-		BaseConfig: config.BaseConfig{
-			EnableOauth: true,
-			Oauth2: config.Oauth2{
-				ClientID:     "test-client",
-				ClientSecret: "test-secret",
-				TokenURL:     "https://auth.example.com/token",
-				IssuerURL:    "https://fake-issuer.example.com", // This should be ignored
-			},
-		},
+	cfg := &config.CompatibilityConfig{
+		EnableOIDCAuth:     true,
+		ClientID:           "test-client",
+		ClientSecret:       "test-secret",
+		AuthServerTokenUrl: "https://auth.example.com/token",
+		IssuerURL:          "https://fake-issuer.example.com",
 	}
 
 	ts, err := NewTokenSource(cfg)

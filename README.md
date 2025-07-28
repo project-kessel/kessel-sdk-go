@@ -38,7 +38,7 @@ import (
 
 func main() {
     ctx := context.Background()
-    grpcConfig := config.NewGRPCConfig(
+    grpcConfig := config.NewCompatibilityConfig(
 		config.WithGRPCEndpoint("your-kessel-server:9000"),
 		config.WithGRPCInsecure(true),
 		config.WithGRPCOAuth2("your-client-id", "your-client-secret", "https://your-auth-server/token"),
@@ -63,7 +63,7 @@ func main() {
         grpc.WithDefaultCallOptions(grpc.MaxCallSendMsgSize(grpcConfig.MaxSendMessageSize)),
     )
 
-    conn, err := grpc.NewClient(grpcConfig.Endpoint, dialOpts...)
+    conn, err := grpc.NewClient(grpcConfig.Url, dialOpts...)
     if err != nil {
         // Example of checking for specific error types using sentinel errors
         if errors.IsConnectionError(err) {
@@ -117,7 +117,7 @@ The SDK supports two OAuth2 configuration approaches:
 Specify the exact OAuth2 token endpoint:
 
 ```go
-grpcConfig := config.NewGRPCConfig(
+grpcConfig := config.NewCompatibilityConfig(
     config.WithGRPCEndpoint("your-server:9000"),
     config.WithGRPCInsecure(true),
     config.WithGRPCOAuth2("your-client-id", "your-client-secret", "https://keycloak.example.com/realms/your-realm/protocol/openid-connect/token"),
@@ -129,7 +129,7 @@ grpcConfig := config.NewGRPCConfig(
 Provide the issuer URL for automatic endpoint discovery via OpenID Connect:
 
 ```go
-grpcConfig := config.NewGRPCConfig(
+grpcConfig := config.NewCompatibilityConfig(
     config.WithGRPCEndpoint("your-server:9000"),
     config.WithGRPCInsecure(true),
     config.WithGRPCOAuth2Issuer("your-client-id", "your-client-secret", "http://localhost:8085/realms/redhat-external"),

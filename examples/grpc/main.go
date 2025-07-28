@@ -21,7 +21,7 @@ func main() {
 	// 2. Issuer-based discovery: Provide the issuer URL and let the SDK discover
 	//    the token endpoint via OpenID Connect Discovery (/.well-known/openid_configuration)
 
-	grpcConfig := config.NewGRPCConfig(
+	grpcConfig := config.NewCompatibilityConfig(
 		config.WithGRPCEndpoint("127.0.0.1:9000"),
 		config.WithGRPCInsecure(true),
 		config.WithGRPCOAuth2Issuer("svc-test", "h91qw8bPiDj9R6VSORsI5TYbceGU5PMH", "http://localhost:8085/realms/redhat-external"),
@@ -48,7 +48,7 @@ func main() {
 		grpc.WithDefaultCallOptions(grpc.MaxCallSendMsgSize(grpcConfig.MaxSendMessageSize)),
 	)
 
-	conn, err := grpc.NewClient(grpcConfig.Endpoint, dialOpts...)
+	conn, err := grpc.NewClient(grpcConfig.Url, dialOpts...)
 	if err != nil {
 		// Example of checking for specific error types using sentinel errors
 		if errors.IsConnectionError(err) {

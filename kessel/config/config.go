@@ -12,10 +12,10 @@ import (
 	"time"
 )
 
-// BaseConfig contains common configuration for gRPC client
-type BaseConfig struct {
-	// Endpoint specifies the server address (host:port)
-	Endpoint string `json:"endpoint" env:"KESSEL_ENDPOINT"`
+// CompatibilityConfig contains common configuration for gRPC client
+type CompatibilityConfig struct {
+	// Url specifies the server address (host:port)
+	Url string `json:"endpoint" env:"KESSEL_ENDPOINT"`
 
 	// Insecure disables transport security
 	Insecure bool `json:"insecure" env:"KESSEL_INSECURE"`
@@ -23,16 +23,18 @@ type BaseConfig struct {
 	// TLSConfig specifies custom TLS configuration
 	TLSConfig *tls.Config `json:"-"`
 
-	// EnableOauth enables OAuth2 authentication
-	EnableOauth bool `json:"enable_oauth" env:"KESSEL_ENABLE_OAUTH"`
+	// EnableOIDCAuth enables OAuth2 authentication
+	EnableOIDCAuth bool `json:"enable_oauth" env:"KESSEL_ENABLE_OAUTH"`
 
-	// Oauth2 specifies OAuth2 configuration
-	Oauth2 Oauth2 `json:"oauth2"`
-}
+	// OAuth2 fields
+	ClientID           string   `json:"client_id" env:"KESSEL_OAUTH2_CLIENT_ID"`
+	ClientSecret       string   `json:"client_secret" env:"KESSEL_OAUTH2_CLIENT_SECRET"`
+	AuthServerTokenUrl string   `json:"authServerTokenUrl" env:"KESSEL_OAUTH2_TOKEN_URL"`
+	IssuerURL          string   `json:"issuer_url" env:"KESSEL_OAUTH2_ISSUER_URL"`
+	Scopes             []string `json:"scopes" env:"KESSEL_OAUTH2_SCOPES" envSeparator:","`
 
-// GRPCConfig contains gRPC-specific configuration
-type GRPCConfig struct {
-	BaseConfig
+	// Timeout specifies the timeout for the client
+	Timeout time.Duration `json:"timeout" env:"KESSEL_TIMEOUT"`
 
 	// MaxReceiveMessageSize sets the maximum message size in bytes the client can receive
 	MaxReceiveMessageSize int `json:"max_receive_message_size" env:"KESSEL_GRPC_MAX_RECEIVE_MESSAGE_SIZE" default:"4194304"`
@@ -41,23 +43,14 @@ type GRPCConfig struct {
 	MaxSendMessageSize int `json:"max_send_message_size" env:"KESSEL_GRPC_MAX_SEND_MESSAGE_SIZE" default:"4194304"`
 }
 
-// Oauth2 contains OAuth2 configuration
-type Oauth2 struct {
-	ClientID     string   `json:"client_id" env:"KESSEL_OAUTH2_CLIENT_ID"`
-	ClientSecret string   `json:"client_secret" env:"KESSEL_OAUTH2_CLIENT_SECRET"`
-	TokenURL     string   `json:"token_url" env:"KESSEL_OAUTH2_TOKEN_URL"`
-	IssuerURL    string   `json:"issuer_url" env:"KESSEL_OAUTH2_ISSUER_URL"`
-	Scopes       []string `json:"scopes" env:"KESSEL_OAUTH2_SCOPES" envSeparator:","`
-}
-
 // DiscoverTokenEndpoint discovers and sets the token endpoint from the issuer URL
-func (o *Oauth2) DiscoverTokenEndpoint(ctx context.Context) error {
-	if o.IssuerURL == "" {
+func (c *CompatibilityConfig) DiscoverTokenEndpoint(ctx context.Context) error {
+	if c.IssuerURL == "" {
 		return fmt.Errorf("issuer_url is required for token endpoint discovery")
 	}
 
 	// Ensure issuerURL doesn't end with a slash
-	issuerURL := strings.TrimSuffix(o.IssuerURL, "/")
+	issuerURL := strings.TrimSuffix(c.IssuerURL, "/")
 
 	// Construct the well-known configuration URL
 	discoveryURL := issuerURL + "/.well-known/openid-configuration"
@@ -109,84 +102,108 @@ func (o *Oauth2) DiscoverTokenEndpoint(ctx context.Context) error {
 	}
 
 	// Update the TokenURL field
-	o.TokenURL = doc.TokenEndpoint
+	c.AuthServerTokenUrl = doc.TokenEndpoint
 
 	return nil
 }
 
-// GRPCClientOption defines a function type for gRPC client configuration
-type GRPCClientOption func(*GRPCConfig)
+// CompatibilityClientOption defines a function type for gRPC client configuration
+type CompatibilityClientOption func(*CompatibilityConfig)
 
 // GRPC Configuration Options
 
-func WithGRPCEndpoint(endpoint string) GRPCClientOption {
-	return func(c *GRPCConfig) {
-		c.Endpoint = endpoint
+func WithGRPCEndpoint(endpoint string) CompatibilityClientOption {
+	return func(c *CompatibilityConfig) {
+		c.Url = endpoint
 	}
 }
 
-func WithGRPCInsecure(insecure bool) GRPCClientOption {
-	return func(c *GRPCConfig) {
+func WithGRPCInsecure(insecure bool) CompatibilityClientOption {
+	return func(c *CompatibilityConfig) {
 		c.Insecure = insecure
 	}
 }
 
-func WithGRPCTLSConfig(tlsConfig *tls.Config) GRPCClientOption {
-	return func(c *GRPCConfig) {
+func WithGRPCTLSConfig(tlsConfig *tls.Config) CompatibilityClientOption {
+	return func(c *CompatibilityConfig) {
 		c.Insecure = false
 		c.TLSConfig = tlsConfig
 	}
 }
 
-func WithGRPCMaxReceiveMessageSize(size int) GRPCClientOption {
-	return func(c *GRPCConfig) {
+func WithGRPCMaxReceiveMessageSize(size int) CompatibilityClientOption {
+	return func(c *CompatibilityConfig) {
 		c.MaxReceiveMessageSize = size
 	}
 }
 
-func WithGRPCMaxSendMessageSize(size int) GRPCClientOption {
-	return func(c *GRPCConfig) {
+func WithGRPCMaxSendMessageSize(size int) CompatibilityClientOption {
+	return func(c *CompatibilityConfig) {
 		c.MaxSendMessageSize = size
 	}
 }
 
-func WithGRPCOAuth2(clientID, clientSecret, tokenURL string, scopes ...string) GRPCClientOption {
-	return func(c *GRPCConfig) {
-		c.EnableOauth = true
-		c.Oauth2.ClientID = clientID
-		c.Oauth2.ClientSecret = clientSecret
-		c.Oauth2.TokenURL = tokenURL
-		c.Oauth2.Scopes = scopes
+func WithTimeout(timeout time.Duration) CompatibilityClientOption {
+	return func(c *CompatibilityConfig) {
+		c.Timeout = timeout
+	}
+}
+
+func WithGRPCOAuth2(clientID, clientSecret, tokenURL string, scopes ...string) CompatibilityClientOption {
+	return func(c *CompatibilityConfig) {
+		c.EnableOIDCAuth = true
+		c.ClientID = clientID
+		c.ClientSecret = clientSecret
+		c.AuthServerTokenUrl = tokenURL
+		c.Scopes = scopes
 	}
 }
 
 // WithGRPCOAuth2Issuer configures OAuth2 authentication using an issuer URL for token endpoint discovery
-func WithGRPCOAuth2Issuer(clientID, clientSecret, issuerURL string, scopes ...string) GRPCClientOption {
-	return func(c *GRPCConfig) {
-		c.EnableOauth = true
-		c.Oauth2.ClientID = clientID
-		c.Oauth2.ClientSecret = clientSecret
-		c.Oauth2.IssuerURL = issuerURL
-		c.Oauth2.Scopes = scopes
+func WithGRPCOAuth2Issuer(clientID, clientSecret, issuerURL string, scopes ...string) CompatibilityClientOption {
+	return func(c *CompatibilityConfig) {
+		c.EnableOIDCAuth = true
+		c.ClientID = clientID
+		c.ClientSecret = clientSecret
+		c.IssuerURL = issuerURL
+		c.Scopes = scopes
 	}
 }
 
-// GetEnableOauth returns the OAuth enable flag for GRPCConfig
-func (c *GRPCConfig) GetEnableOauth() bool {
-	return c.EnableOauth
+// GetEnableOIDCAuth returns the OAuth enable flag for CompatibilityConfig
+func (c *CompatibilityConfig) GetEnableOIDCAuth() bool {
+	return c.EnableOIDCAuth
 }
 
-// GetOauth2 returns the OAuth2 configuration for GRPCConfig
-func (c *GRPCConfig) GetOauth2() Oauth2 {
-	return c.Oauth2
+// GetClientID returns the OAuth client ID
+func (c *CompatibilityConfig) GetClientID() string {
+	return c.ClientID
 }
 
-// NewGRPCConfig creates a new gRPC configuration with default values
-func NewGRPCConfig(options ...GRPCClientOption) *GRPCConfig {
-	config := &GRPCConfig{
-		BaseConfig: BaseConfig{
-			Insecure: false,
-		},
+// GetClientSecret returns the OAuth client secret
+func (c *CompatibilityConfig) GetClientSecret() string {
+	return c.ClientSecret
+}
+
+// GetTokenURL returns the OAuth token URL
+func (c *CompatibilityConfig) GetTokenURL() string {
+	return c.AuthServerTokenUrl
+}
+
+// GetIssuerURL returns the OAuth issuer URL
+func (c *CompatibilityConfig) GetIssuerURL() string {
+	return c.IssuerURL
+}
+
+// GetScopes returns the OAuth scopes
+func (c *CompatibilityConfig) GetScopes() []string {
+	return c.Scopes
+}
+
+// NewCompatibilityConfig creates a new gRPC configuration with default values
+func NewCompatibilityConfig(options ...CompatibilityClientOption) *CompatibilityConfig {
+	config := &CompatibilityConfig{
+		Insecure:              false,
 		MaxReceiveMessageSize: 4 * 1024 * 1024, // 4MB
 		MaxSendMessageSize:    4 * 1024 * 1024, // 4MB
 	}
