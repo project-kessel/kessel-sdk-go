@@ -39,19 +39,23 @@ import (
 func main() {
     ctx := context.Background()
     grpcConfig := config.NewCompatibilityConfig(
-		config.WithGRPCEndpoint("your-kessel-server:9000"),
-		config.WithGRPCInsecure(true),
-		config.WithGRPCOAuth2("your-client-id", "your-client-secret", "https://your-auth-server/token"),
-	)
+        config.WithGRPCEndpoint("your-kessel-server:9000"),
+        config.WithGRPCInsecure(true),
+    )
 
-    // Create OAuth2 token source
-    tokenSource, err := auth.NewTokenSource(grpcConfig)
+    issuerURL := "http://localhost:8085/realms/redhat-external"
+	discovery, err := auth.FetchOIDCDiscovery(ctx, issuerURL)
+	if err != nil {
+		log.Fatal("Failed to fetch OIDC discovery: ", err)
+	}
+
+    authCredentials, err := auth.NewOAuth2ClientCredentials(
+        "your-client-id",
+        "your-client-secret",
+        discovery.TokenEndpoint(),
+    )
     if err != nil {
-        if errors.IsTokenError(err) {
-            log.Fatal("OAuth2 token configuration failed: ", err)
-        } else {
-            log.Fatal("Unknown auth error: ", err)
-        }
+		log.Fatal("OAuth2 credential creation failed: ", err)
     }
 
     // Using insecure credentials for local development
@@ -117,22 +121,29 @@ The SDK supports two OAuth2 configuration approaches:
 Specify the exact OAuth2 token endpoint:
 
 ```go
-grpcConfig := config.NewCompatibilityConfig(
-    config.WithGRPCEndpoint("your-server:9000"),
-    config.WithGRPCInsecure(true),
-    config.WithGRPCOAuth2("your-client-id", "your-client-secret", "https://keycloak.example.com/realms/your-realm/protocol/openid-connect/token"),
+authCredentials, err := auth.NewOAuth2ClientCredentials(
+    "your-client-id",
+    "your-client-secret",
+    "https://auth.server.com/oauth/token",
 )
 ```
 
 #### 2. Issuer-Based Discovery
 
-Provide the issuer URL for automatic endpoint discovery via OpenID Connect:
+If you need to discover the token endpoint from an issuer:
 
 ```go
-grpcConfig := config.NewCompatibilityConfig(
-    config.WithGRPCEndpoint("your-server:9000"),
-    config.WithGRPCInsecure(true),
-    config.WithGRPCOAuth2Issuer("your-client-id", "your-client-secret", "http://localhost:8085/realms/redhat-external"),
+// Step 1: Discover endpoints
+discovery, err := auth.FetchOIDCDiscovery(ctx, "https://your-issuer.com")
+if err != nil {
+    log.Fatal(err)
+}
+
+// Step 2: Create credentials with discovered endpoint
+authCredentials, err := auth.NewOAuth2ClientCredentials(
+    "your-client-id",
+    "your-client-secret",
+    discovery.TokenEndpoint(),
 )
 ```
 
