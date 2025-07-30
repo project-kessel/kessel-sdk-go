@@ -28,9 +28,9 @@ import (
     "context"
     "log"
 
+	"github.com/project-kessel/kessel-sdk-go/kessel/auth"
     "github.com/project-kessel/kessel-sdk-go/kessel/config"
     "github.com/project-kessel/kessel-sdk-go/kessel/errors"
-    "github.com/project-kessel/kessel-sdk-go/kessel/grpc/auth"
     v1beta2 "github.com/project-kessel/kessel-sdk-go/kessel/inventory/v1beta2"
     "google.golang.org/grpc"
     "google.golang.org/grpc/credentials/insecure"

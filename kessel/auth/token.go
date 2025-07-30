@@ -20,11 +20,6 @@ import (
 	"google.golang.org/grpc/credentials/oauth"
 )
 
-// TokenSource wraps oauth2.TokenSource for easier testing and management
-type TokenSource struct {
-	source oauth2.TokenSource
-}
-
 // OIDCDiscoveryMetadata represents OIDC discovery metadata
 type OIDCDiscoveryMetadata struct {
 	document map[string]interface{}
@@ -95,7 +90,7 @@ func FetchOIDCDiscovery(ctx context.Context, issuerURL string) (*OIDCDiscoveryMe
 // This class only accepts a direct token URL. For OIDC discovery, use the
 // FetchOIDCDiscovery function to obtain the token endpoint first.
 type OAuth2ClientCredentials struct {
-	*TokenSource
+	source oauth2.TokenSource
 }
 
 // NewOAuth2ClientCredentials creates a new OAuth2ClientCredentials instance
@@ -125,18 +120,14 @@ func NewOAuth2ClientCredentials(clientID, clientSecret, tokenURL string) (*OAuth
 		TokenURL:     tokenURL,
 	}
 
-	tokenSource := &TokenSource{
-		source: clientCredConfig.TokenSource(context.Background()),
-	}
-
 	return &OAuth2ClientCredentials{
-		TokenSource: tokenSource,
+		source: clientCredConfig.TokenSource(context.Background()),
 	}, nil
 }
 
 // GetToken retrieves a valid OAuth2 token
-func (ts *TokenSource) GetToken(ctx context.Context) (*oauth2.Token, error) {
-	token, err := ts.source.Token()
+func (c *OAuth2ClientCredentials) GetToken(ctx context.Context) (*oauth2.Token, error) {
+	token, err := c.source.Token()
 	if err != nil {
 		return nil, errors.NewTokenError(err, "failed to retrieve OAuth2 token")
 	}
@@ -144,26 +135,26 @@ func (ts *TokenSource) GetToken(ctx context.Context) (*oauth2.Token, error) {
 }
 
 // GetGRPCCredentials returns gRPC credentials for OAuth2 authentication
-func (ts *TokenSource) GetGRPCCredentials() credentials.PerRPCCredentials {
-	return oauth.TokenSource{TokenSource: ts.source}
+func (c *OAuth2ClientCredentials) GetGRPCCredentials() credentials.PerRPCCredentials {
+	return oauth.TokenSource{TokenSource: c.source}
 }
 
 // GetInsecureGRPCCredentials returns gRPC credentials for OAuth2 authentication that don't require transport security
-func (ts *TokenSource) GetInsecureGRPCCredentials() credentials.PerRPCCredentials {
+func (c *OAuth2ClientCredentials) GetInsecureGRPCCredentials() credentials.PerRPCCredentials {
 	return &insecureOAuthCreds{
-		tokenSource: ts.source,
+		tokenSource: c.source,
 	}
 }
 
 // GetCallOption returns a gRPC call option with OAuth2 credentials
-func (ts *TokenSource) GetCallOption() grpc.CallOption {
-	return grpc.PerRPCCredentials(ts.GetGRPCCredentials())
+func (c *OAuth2ClientCredentials) GetCallOption() grpc.CallOption {
+	return grpc.PerRPCCredentials(c.GetGRPCCredentials())
 }
 
 // GetInsecureCallOption returns a gRPC call option with OAuth2 credentials for insecure connections
-func (ts *TokenSource) GetInsecureCallOption() grpc.CallOption {
+func (c *OAuth2ClientCredentials) GetInsecureCallOption() grpc.CallOption {
 	// For insecure connections, we create a custom credentials that doesn't require transport security
-	return grpc.PerRPCCredentials(ts.GetInsecureGRPCCredentials())
+	return grpc.PerRPCCredentials(c.GetInsecureGRPCCredentials())
 }
 
 // insecureOAuthCreds implements credentials.PerRPCCredentials for insecure connections
