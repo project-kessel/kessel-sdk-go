@@ -3,48 +3,7 @@ package auth
 import (
 	"strings"
 	"testing"
-
-	"github.com/project-kessel/kessel-sdk-go/kessel/config"
 )
-
-func TestTokenSource_IssuerDiscovery(t *testing.T) {
-	// Test that issuer discovery fails with fake URL (this tests our custom logic)
-	cfg := &config.CompatibilityConfig{
-		EnableOIDCAuth: true,
-		ClientID:       "test-client",
-		ClientSecret:   "test-secret",
-		IssuerURL:      "https://fake-issuer.example.com",
-	}
-
-	_, err := NewTokenSource(cfg)
-	if err == nil {
-		t.Fatal("expected error with fake issuer URL but got none")
-	}
-
-	if !strings.Contains(err.Error(), "failed to discover token endpoint") {
-		t.Errorf("expected error message to mention discovery failure, got %q", err.Error())
-	}
-}
-
-func TestTokenSource_TokenURLPrecedence(t *testing.T) {
-	// Test that TokenURL takes precedence over IssuerURL
-	cfg := &config.CompatibilityConfig{
-		EnableOIDCAuth:     true,
-		ClientID:           "test-client",
-		ClientSecret:       "test-secret",
-		AuthServerTokenUrl: "https://auth.example.com/token",
-		IssuerURL:          "https://fake-issuer.example.com",
-	}
-
-	ts, err := NewTokenSource(cfg)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	if ts == nil {
-		t.Fatal("expected TokenSource but got nil")
-	}
-}
 
 func TestInsecureOAuthCreds_RequireTransportSecurity(t *testing.T) {
 	// Test our custom insecure credentials logic
@@ -52,5 +11,49 @@ func TestInsecureOAuthCreds_RequireTransportSecurity(t *testing.T) {
 
 	if creds.RequireTransportSecurity() {
 		t.Error("expected insecure credentials to not require transport security")
+	}
+}
+
+func TestNewOAuth2ClientCredentials_MissingCredentials(t *testing.T) {
+	tests := []struct {
+		name         string
+		clientID     string
+		clientSecret string
+		tokenURL     string
+		expectedErr  string
+	}{
+		{
+			name:         "missing client ID",
+			clientID:     "",
+			clientSecret: "secret",
+			tokenURL:     "https://auth.example.com/token",
+			expectedErr:  "client_id and client_secret are required",
+		},
+		{
+			name:         "missing client secret",
+			clientID:     "client",
+			clientSecret: "",
+			tokenURL:     "https://auth.example.com/token",
+			expectedErr:  "client_id and client_secret are required",
+		},
+		{
+			name:         "missing token URL",
+			clientID:     "client",
+			clientSecret: "secret",
+			tokenURL:     "",
+			expectedErr:  "token_url is required",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := NewOAuth2ClientCredentials(tt.clientID, tt.clientSecret, tt.tokenURL)
+			if err == nil {
+				t.Fatal("expected error but got none")
+			}
+			if !strings.Contains(err.Error(), tt.expectedErr) {
+				t.Errorf("expected error to contain %v, got %v", tt.expectedErr, err.Error())
+			}
+		})
 	}
 }

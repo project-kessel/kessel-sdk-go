@@ -20,29 +20,29 @@ import (
 	"google.golang.org/grpc/credentials/oauth"
 )
 
-// OAuthConfig interface for extracting OAuth configuration from different config types
-type OAuthConfig interface {
-	GetEnableOIDCAuth() bool
-	GetClientID() string
-	GetClientSecret() string
-	GetTokenURL() string
-	GetIssuerURL() string
-	GetScopes() []string
-}
-
 // TokenSource wraps oauth2.TokenSource for easier testing and management
 type TokenSource struct {
 	source oauth2.TokenSource
 }
 
-// OIDCDiscoveryDocument represents the OpenID Connect Discovery document
-type OIDCDiscoveryDocument struct {
-	TokenEndpoint string `json:"token_endpoint"`
-	Issuer        string `json:"issuer"`
+// OIDCDiscoveryMetadata represents OIDC discovery metadata
+type OIDCDiscoveryMetadata struct {
+	document map[string]interface{}
 }
 
-// discoverTokenEndpoint performs OpenID Connect Discovery to get the token endpoint
-func discoverTokenEndpoint(ctx context.Context, issuerURL string) (string, error) {
+// TokenEndpoint returns the token endpoint from the discovery document
+func (m *OIDCDiscoveryMetadata) TokenEndpoint() string {
+	if endpoint, ok := m.document["token_endpoint"].(string); ok {
+		return endpoint
+	}
+	return ""
+}
+
+// FetchOIDCDiscovery fetches OIDC discovery metadata from some provider
+//
+// This function makes a network request to the OIDC provider's discovery endpoint
+// to retrieve the provider's metadata including the token endpoint.
+func FetchOIDCDiscovery(ctx context.Context, issuerURL string) (*OIDCDiscoveryMetadata, error) {
 	// Ensure issuerURL doesn't end with a slash
 	issuerURL = strings.TrimSuffix(issuerURL, "/")
 
@@ -58,7 +58,7 @@ func discoverTokenEndpoint(ctx context.Context, issuerURL string) (string, error
 	// Create request
 	req, err := http.NewRequestWithContext(ctx, "GET", discoveryURL, nil)
 	if err != nil {
-		return "", fmt.Errorf("failed to create discovery request: %w", err)
+		return nil, fmt.Errorf("failed to create discovery request: %w", err)
 	}
 
 	// Add User-Agent header - some servers (like Keycloak) may reject requests without it
@@ -68,7 +68,7 @@ func discoverTokenEndpoint(ctx context.Context, issuerURL string) (string, error
 	// Make request
 	resp, err := client.Do(req)
 	if err != nil {
-		return "", fmt.Errorf("failed to fetch discovery document: %w", err)
+		return nil, fmt.Errorf("failed to fetch discovery document: %w", err)
 	}
 	defer func() {
 		if closeErr := resp.Body.Close(); closeErr != nil {
@@ -78,68 +78,59 @@ func discoverTokenEndpoint(ctx context.Context, issuerURL string) (string, error
 
 	// Check response status
 	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("discovery request failed with status %d", resp.StatusCode)
+		return nil, fmt.Errorf("discovery request failed with status %d", resp.StatusCode)
 	}
 
 	// Parse response
-	var doc OIDCDiscoveryDocument
-	if err := json.NewDecoder(resp.Body).Decode(&doc); err != nil {
-		return "", fmt.Errorf("failed to decode discovery document: %w", err)
+	var document map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&document); err != nil {
+		return nil, fmt.Errorf("failed to decode discovery document: %w", err)
 	}
 
-	// Validate token endpoint
-	if doc.TokenEndpoint == "" {
-		return "", fmt.Errorf("token_endpoint not found in discovery document")
-	}
-
-	// Validate that token endpoint is a valid URL
-	if _, err := url.Parse(doc.TokenEndpoint); err != nil {
-		return "", fmt.Errorf("invalid token_endpoint URL: %w", err)
-	}
-
-	return doc.TokenEndpoint, nil
+	return &OIDCDiscoveryMetadata{document: document}, nil
 }
 
-// NewTokenSource creates a new OAuth2 token source using client credentials flow
-func NewTokenSource(cfg OAuthConfig) (*TokenSource, error) {
-	if cfg.GetClientID() == "" || cfg.GetClientSecret() == "" {
+// OAuth2ClientCredentials handles the OAuth 2.0 Client Credentials flow
+//
+// This class only accepts a direct token URL. For OIDC discovery, use the
+// FetchOIDCDiscovery function to obtain the token endpoint first.
+type OAuth2ClientCredentials struct {
+	*TokenSource
+}
+
+// NewOAuth2ClientCredentials creates a new OAuth2ClientCredentials instance
+func NewOAuth2ClientCredentials(clientID, clientSecret, tokenURL string) (*OAuth2ClientCredentials, error) {
+	if clientID == "" || clientSecret == "" {
 		return nil, errors.New(errors.ErrTokenRetrieval,
 			codes.InvalidArgument,
 			"OAuth2 configuration incomplete: client_id and client_secret are required")
 	}
 
-	// Determine token URL - either from direct config or issuer discovery
-	var tokenURL string
-	if cfg.GetTokenURL() != "" {
-		// Use directly configured token URL
-		tokenURL = cfg.GetTokenURL()
-	} else if cfg.GetIssuerURL() != "" {
-		// Discover token endpoint from issuer
-		ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-		defer cancel()
-
-		discoveredTokenURL, err := discoverTokenEndpoint(ctx, cfg.GetIssuerURL())
-		if err != nil {
-			return nil, errors.New(errors.ErrTokenRetrieval,
-				codes.InvalidArgument,
-				fmt.Sprintf("failed to discover token endpoint from issuer %s: %v", cfg.GetIssuerURL(), err))
-		}
-		tokenURL = discoveredTokenURL
-	} else {
+	if tokenURL == "" {
 		return nil, errors.New(errors.ErrTokenRetrieval,
 			codes.InvalidArgument,
-			"OAuth2 configuration incomplete: either token_url or issuer_url must be provided")
+			"OAuth2 configuration incomplete: token_url is required")
+	}
+
+	// Validate token URL format
+	if _, err := url.Parse(tokenURL); err != nil {
+		return nil, errors.New(errors.ErrTokenRetrieval,
+			codes.InvalidArgument,
+			fmt.Sprintf("invalid token_url: %v", err))
 	}
 
 	clientCredConfig := &clientcredentials.Config{
-		ClientID:     cfg.GetClientID(),
-		ClientSecret: cfg.GetClientSecret(),
+		ClientID:     clientID,
+		ClientSecret: clientSecret,
 		TokenURL:     tokenURL,
-		Scopes:       cfg.GetScopes(),
 	}
 
-	return &TokenSource{
+	tokenSource := &TokenSource{
 		source: clientCredConfig.TokenSource(context.Background()),
+	}
+
+	return &OAuth2ClientCredentials{
+		TokenSource: tokenSource,
 	}, nil
 }
 

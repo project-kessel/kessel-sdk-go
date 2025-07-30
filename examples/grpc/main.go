@@ -24,24 +24,27 @@ func main() {
 	grpcConfig := config.NewCompatibilityConfig(
 		config.WithGRPCEndpoint("127.0.0.1:9000"),
 		config.WithGRPCInsecure(true),
-		config.WithGRPCOAuth2Issuer("svc-test", "h91qw8bPiDj9R6VSORsI5TYbceGU5PMH", "http://localhost:8085/realms/redhat-external"),
 	)
 
-	// Create OAuth2 token source
-	tokenSource, err := auth.NewTokenSource(grpcConfig)
+	issuerURL := "http://localhost:8085/realms/redhat-external"
+	discovery, err := auth.FetchOIDCDiscovery(ctx, issuerURL)
 	if err != nil {
-		if errors.IsTokenError(err) {
-			log.Fatal("OAuth2 token configuration failed: ", err)
-		} else {
-			log.Fatal("Unknown auth error: ", err)
-		}
+		log.Fatal("Failed to fetch OIDC discovery: ", err)
 	}
 
-	// Using insecure credentials for local development
-	var dialOpts []grpc.DialOption
-	dialOpts = append(dialOpts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	authCredentials, err := auth.NewOAuth2ClientCredentials(
+		"svc-test",
+		"h91qw8bPiDj9R6VSORsI5TYbceGU5PMH",
+		discovery.TokenEndpoint(),
+	)
+	if err != nil {
+		log.Fatal("OAuth2 credential creation failed: ", err)
+	}
 
-	dialOpts = append(dialOpts, grpc.WithPerRPCCredentials(tokenSource.GetInsecureGRPCCredentials()))
+	var dialOpts []grpc.DialOption
+
+	dialOpts = append(dialOpts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	dialOpts = append(dialOpts, grpc.WithPerRPCCredentials(authCredentials.GetInsecureGRPCCredentials()))
 
 	dialOpts = append(dialOpts,
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcConfig.MaxReceiveMessageSize)),
