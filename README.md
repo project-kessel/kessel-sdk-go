@@ -1,12 +1,10 @@
 # Kessel SDK for Go
 
-The official Go SDK for the Kessel inventory and authorization service. This SDK provides gRPC client implementation with built-in OAuth2 support for secure authentication.
+The official Go SDK for the Kessel inventory service and authorization service. This SDK provides gRPC client implementation for secure communication.
 
 ## Features
 
 - **gRPC client support** - High-performance gRPC communication
-- **OAuth2 authentication** - Built-in support with automatic token injection
-- **Flexible configuration** - Direct token URL or issuer-based discovery
 - **Type-safe API** - Generated from protobuf definitions
 - **Comprehensive error handling** - Rich error types with gRPC status codes
 - **Production ready** - Built with security, performance, and reliability in mind
@@ -28,7 +26,6 @@ import (
     "context"
     "log"
 
-	"github.com/project-kessel/kessel-sdk-go/kessel/auth"
     "github.com/project-kessel/kessel-sdk-go/kessel/config"
     "github.com/project-kessel/kessel-sdk-go/kessel/errors"
     v1beta2 "github.com/project-kessel/kessel-sdk-go/kessel/inventory/v1beta2"
@@ -38,30 +35,15 @@ import (
 
 func main() {
     ctx := context.Background()
+    
     grpcConfig := config.NewCompatibilityConfig(
         config.WithGRPCEndpoint("your-kessel-server:9000"),
         config.WithGRPCInsecure(true),
     )
 
-    issuerURL := "http://localhost:8085/realms/redhat-external"
-	discovery, err := auth.FetchOIDCDiscovery(ctx, issuerURL)
-	if err != nil {
-		log.Fatal("Failed to fetch OIDC discovery: ", err)
-	}
-
-    authCredentials, err := auth.NewOAuth2ClientCredentials(
-        "your-client-id",
-        "your-client-secret",
-        discovery.TokenEndpoint(),
-    )
-    if err != nil {
-		log.Fatal("OAuth2 credential creation failed: ", err)
-    }
-
     // Using insecure credentials for local development
     var dialOpts []grpc.DialOption
     dialOpts = append(dialOpts, grpc.WithTransportCredentials(insecure.NewCredentials()))
-    dialOpts = append(dialOpts, grpc.WithPerRPCCredentials(tokenSource.GetInsecureGRPCCredentials()))
     dialOpts = append(dialOpts,
         grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcConfig.MaxReceiveMessageSize)),
         grpc.WithDefaultCallOptions(grpc.MaxCallSendMsgSize(grpcConfig.MaxSendMessageSize)),
@@ -72,8 +54,6 @@ func main() {
         // Example of checking for specific error types using sentinel errors
         if errors.IsConnectionError(err) {
             log.Fatal("Failed to establish connection:", err)
-        } else if errors.IsTokenError(err) {
-            log.Fatal("OAuth2 token configuration failed:", err)
         } else {
             log.Fatal("Unknown error:", err)
         }
@@ -112,57 +92,16 @@ func main() {
 
 ## Configuration
 
-### OAuth2 Authentication
+### gRPC Endpoint
 
-The SDK supports two OAuth2 configuration approaches:
-
-#### 1. Direct Token URL
-
-Specify the exact OAuth2 token endpoint:
+Specify the gRPC endpoint:
 
 ```go
-authCredentials, err := auth.NewOAuth2ClientCredentials(
-    "your-client-id",
-    "your-client-secret",
-    "https://auth.server.com/oauth/token",
+grpcConfig := config.NewCompatibilityConfig(
+    config.WithGRPCEndpoint("your-kessel-server:9000"),
+    config.WithGRPCInsecure(true),
 )
 ```
-
-#### 2. Issuer-Based Discovery
-
-If you need to discover the token endpoint from an issuer:
-
-```go
-// Step 1: Discover endpoints
-discovery, err := auth.FetchOIDCDiscovery(ctx, "https://your-issuer.com")
-if err != nil {
-    log.Fatal(err)
-}
-
-// Step 2: Create credentials with discovered endpoint
-authCredentials, err := auth.NewOAuth2ClientCredentials(
-    "your-client-id",
-    "your-client-secret",
-    discovery.TokenEndpoint(),
-)
-```
-
-## API Reference
-
-### Automatic Authentication
-
-OAuth2 tokens are automatically injected into all requests when configured. No manual token management is required:
-
-```go
-// Configure OAuth2 once during client creation
-
-// All subsequent calls automatically include OAuth2 tokens
-response, err := client.Check(ctx, request)
-response, err := client.ReportResource(ctx, reportRequest)
-response, err := client.DeleteResource(ctx, deleteRequest)
-```
-
-### Configuration Options
 
 ## Error Handling
 
@@ -171,23 +110,10 @@ The SDK provides rich error types for different failure scenarios:
 ```go
 import "github.com/project-kessel/kessel-sdk-go/kessel/errors"
 
-tokenSource, err := auth.NewTokenSource(grpcConfig)
-if err != nil {
-    if errors.IsTokenError(err) {
-        // Handle OAuth2 authentication errors
-        log.Fatal("OAuth2 authentication failed:", err)
-    } else {
-        // Handle other errors
-        log.Fatal("Unknown error:", err)
-    }
-}
-
 conn, err := grpc.NewClient(endpoint, dialOpts...)
 if err != nil {
     if errors.IsConnectionError(err) {
         log.Fatal("Failed to connect to server:", err)
-    } else if errors.IsTokenError(err) {
-        log.Fatal("OAuth2 authentication failed:", err)
     } else {
         log.Fatal("Unknown error:", err)
     }
@@ -196,7 +122,6 @@ if err != nil {
 
 Available error checkers:
 - `errors.IsConnectionError(err)` - Network/connection failures
-- `errors.IsTokenError(err)` - OAuth2 authentication failures
 
 ## Examples
 

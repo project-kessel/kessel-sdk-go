@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/project-kessel/kessel-sdk-go/kessel/auth"
 	"github.com/project-kessel/kessel-sdk-go/kessel/config"
 	"github.com/project-kessel/kessel-sdk-go/kessel/errors"
 	v1beta2 "github.com/project-kessel/kessel-sdk-go/kessel/inventory/v1beta2"
@@ -16,35 +15,14 @@ import (
 func main() {
 	ctx := context.Background()
 
-	// The SDK supports two OAuth2 configuration approaches:
-	// 1. Direct token URL: Specify the exact OAuth2 token endpoint URL
-	// 2. Issuer-based discovery: Provide the issuer URL and let the SDK discover
-	//    the token endpoint via OpenID Connect Discovery (/.well-known/openid_configuration)
-
 	grpcConfig := config.NewCompatibilityConfig(
 		config.WithGRPCEndpoint("127.0.0.1:9000"),
 		config.WithGRPCInsecure(true),
 	)
 
-	issuerURL := "http://localhost:8085/realms/redhat-external"
-	discovery, err := auth.FetchOIDCDiscovery(ctx, issuerURL)
-	if err != nil {
-		log.Fatal("Failed to fetch OIDC discovery: ", err)
-	}
-
-	authCredentials, err := auth.NewOAuth2ClientCredentials(
-		"svc-test",
-		"h91qw8bPiDj9R6VSORsI5TYbceGU5PMH",
-		discovery.TokenEndpoint(),
-	)
-	if err != nil {
-		log.Fatal("OAuth2 credential creation failed: ", err)
-	}
-
 	var dialOpts []grpc.DialOption
 
 	dialOpts = append(dialOpts, grpc.WithTransportCredentials(insecure.NewCredentials()))
-	dialOpts = append(dialOpts, grpc.WithPerRPCCredentials(authCredentials.GetInsecureGRPCCredentials()))
 
 	dialOpts = append(dialOpts,
 		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcConfig.MaxReceiveMessageSize)),
@@ -56,8 +34,6 @@ func main() {
 		// Example of checking for specific error types using sentinel errors
 		if errors.IsConnectionError(err) {
 			log.Fatal("Failed to establish connection:", err)
-		} else if errors.IsTokenError(err) {
-			log.Fatal("OAuth2 token configuration failed:", err)
 		} else {
 			log.Fatal("Unknown error:", err)
 		}
@@ -88,8 +64,7 @@ func main() {
 		},
 	}
 
-	// OAuth2 tokens are automatically injected - no manual token management needed!
-	fmt.Println("Making request with automatic OAuth2 token injection:")
+	fmt.Println("Making basic gRPC request:")
 
 	response, err := inventoryClient.Check(ctx, checkRequest)
 	if err != nil {
