@@ -25,17 +25,17 @@ build: ## Build example binaries
 .PHONY: lint
 lint: ## Run golangci-lint
 	@echo "Running golangci-lint"
-	@$(DOCKER) run -t --rm -v $(PWD):/app -w /app golangci/golangci-lint:v2.1 golangci-lint run -v ./examples/... ./kessel/auth/... ./kessel/config/... ./kessel/errors/... ./kessel/inventory/...
+	@$(DOCKER) run -t --rm -v $(PWD):/app -w /app golangci/golangci-lint:v2.1 golangci-lint run -v ./examples/... ./kessel/config/... ./kessel/errors/... ./kessel/inventory/...
 
 .PHONY: test
 test: ## Run all tests
 	@echo "Running tests"
-	@go test -v ./kessel/auth/... ./kessel/config/... ./kessel/errors/... ./kessel/inventory/...
+	@go test -v ./kessel/config/... ./kessel/errors/... ./kessel/inventory/...
 
 .PHONY: test-coverage
 test-coverage: ## Run tests with coverage
 	@echo "Running tests with coverage"
-	@go test -coverprofile=coverage.out ./kessel/auth/... ./kessel/config/... ./kessel/errors/... ./kessel/inventory/...
+	@go test -coverprofile=coverage.out ./kessel/config/... ./kessel/errors/... ./kessel/inventory/...
 	@go tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report generated: coverage.html"
 
