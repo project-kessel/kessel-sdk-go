@@ -6,7 +6,6 @@ The official Go SDK for the Kessel inventory and authorization service. This SDK
 
 - **gRPC client support** - High-performance gRPC communication
 - **Type-safe API** - Generated from protobuf definitions
-- **Comprehensive error handling** - Rich error types with gRPC status codes
 - **Production ready** - Built with security, performance, and reliability in mind
 
 ## Installation
@@ -23,14 +22,16 @@ go get github.com/project-kessel/kessel-sdk-go
 package main
 
 import (
-    "context"
-    "log"
+	"context"
+	"fmt"
+	"log"
 
-    "github.com/project-kessel/kessel-sdk-go/kessel/config"
-    "github.com/project-kessel/kessel-sdk-go/kessel/errors"
-    v1beta2 "github.com/project-kessel/kessel-sdk-go/kessel/inventory/v1beta2"
-    "google.golang.org/grpc"
-    "google.golang.org/grpc/credentials/insecure"
+	"github.com/project-kessel/kessel-sdk-go/kessel/config"
+	v1beta2 "github.com/project-kessel/kessel-sdk-go/kessel/inventory/v1beta2"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 )
 
 func main() {
@@ -51,8 +52,8 @@ func main() {
 
     conn, err := grpc.NewClient(grpcConfig.Url, dialOpts...)
     if err != nil {
-		log.Fatal("Failed to create gRPC client:", err)
-	}
+        log.Fatal("Failed to create gRPC client:", err)
+    }
     defer func() {
         if closeErr := conn.Close(); closeErr != nil {
             log.Printf("Failed to close gRPC client: %v", closeErr)
@@ -66,6 +67,9 @@ func main() {
         Object: &v1beta2.ResourceReference{
             ResourceType: "host",
             ResourceId:   "server-123",
+            Reporter: &v1beta2.ReporterReference{
+                Type: "HBI",
+            },
         },
         Relation: "member",
         Subject: &v1beta2.SubjectReference{
@@ -76,20 +80,20 @@ func main() {
         },
     }
 
-    response, err := client.Check(context.Background(), request)
+    response, err := inventoryClient.Check(ctx, checkRequest)
     if err != nil {
         if st, ok := status.FromError(err); ok {
-			switch st.Code() {
-			case codes.Unavailable:
-				log.Fatal("Service unavailable: ", err)
-			case codes.PermissionDenied:
-				log.Fatal("Permission denied: ", err)
-			default:
-				log.Fatal("gRPC connection error: ", err)
-			}
-		} else {
-			log.Fatal("Unknown error: ", err)
-		}
+            switch st.Code() {
+            case codes.Unavailable:
+                log.Fatal("Service unavailable: ", err)
+            case codes.PermissionDenied:
+                log.Fatal("Permission denied: ", err)
+            default:
+                log.Fatal("gRPC connection error: ", err)
+            }
+        } else {
+            log.Fatal("Unknown error: ", err)
+        }
     }
 
     log.Printf("Check result: %v", response.Allowed)
