@@ -5,41 +5,42 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/project-kessel/kessel-sdk-go/kessel/errors"
+	"github.com/project-kessel/kessel-sdk-go/kessel/config"
 	v1beta2 "github.com/project-kessel/kessel-sdk-go/kessel/inventory/v1beta2"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 )
 
 func main() {
 	ctx := context.Background()
 
-	// The SDK supports two OAuth2 configuration approaches:
-	// 1. Direct token URL: Specify the exact OAuth2 token endpoint URL
-	// 2. Issuer-based discovery: Provide the issuer URL and let the SDK discover
-	//    the token endpoint via OpenID Connect Discovery (/.well-known/openid_configuration)
+	grpcConfig := config.NewCompatibilityConfig(
+		config.WithGRPCEndpoint("127.0.0.1:9000"),
+		config.WithGRPCInsecure(true),
+	)
 
-	inventoryClient, err := v1beta2.NewInventoryGRPCClientBuilder().
-		WithEndpoint("127.0.0.1:9000").
-		WithInsecure(true).
-		WithOAuth2Issuer("svc-test", "h91qw8bPiDj9R6VSORsI5TYbceGU5PMH", "http://localhost:8085/realms/redhat-external").
-		WithMaxReceiveMessageSize(8 * 1024 * 1024). // 8MB
-		WithMaxSendMessageSize(8 * 1024 * 1024).    // 8MB
-		Build()
+	var dialOpts []grpc.DialOption
 
+	dialOpts = append(dialOpts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+
+	dialOpts = append(dialOpts,
+		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcConfig.MaxReceiveMessageSize)),
+		grpc.WithDefaultCallOptions(grpc.MaxCallSendMsgSize(grpcConfig.MaxSendMessageSize)),
+	)
+
+	conn, err := grpc.NewClient(grpcConfig.Url, dialOpts...)
 	if err != nil {
-		// Example of checking for specific error types using sentinel errors
-		if errors.IsConnectionError(err) {
-			log.Fatal("Failed to establish connection:", err)
-		} else if errors.IsTokenError(err) {
-			log.Fatal("OAuth2 token configuration failed:", err)
-		} else {
-			log.Fatal("Unknown error:", err)
-		}
+		log.Fatal("Failed to create gRPC client:", err)
 	}
 	defer func() {
-		if closeErr := inventoryClient.Close(); closeErr != nil {
+		if closeErr := conn.Close(); closeErr != nil {
 			log.Printf("Failed to close gRPC client: %v", closeErr)
 		}
 	}()
+
+	inventoryClient := v1beta2.NewKesselInventoryServiceClient(conn)
 
 	// Example request using the external API types
 	checkRequest := &v1beta2.CheckRequest{
@@ -59,13 +60,22 @@ func main() {
 		},
 	}
 
-	// OAuth2 tokens are automatically injected - no manual token management needed!
-	fmt.Println("Making request with automatic OAuth2 token injection:")
+	fmt.Println("Making basic gRPC request:")
 
 	response, err := inventoryClient.Check(ctx, checkRequest)
 	if err != nil {
-		fmt.Printf("Request failed with error: %v\n", err)
-		return
+		if st, ok := status.FromError(err); ok {
+			switch st.Code() {
+			case codes.Unavailable:
+				log.Fatal("Service unavailable: ", err)
+			case codes.PermissionDenied:
+				log.Fatal("Permission denied: ", err)
+			default:
+				log.Fatal("gRPC connection error: ", err)
+			}
+		} else {
+			log.Fatal("Unknown error: ", err)
+		}
 	}
 	fmt.Printf("Check response: %+v\n", response)
 }
