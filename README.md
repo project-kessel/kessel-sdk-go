@@ -1,6 +1,6 @@
 # Kessel SDK for Go
 
-The official Go SDK for the Kessel inventory service and authorization service. This SDK provides gRPC client implementation for secure communication.
+The official Go SDK for the Kessel inventory and authorization service. This SDK provides gRPC client implementation for secure communication.
 
 ## Features
 
@@ -51,13 +51,8 @@ func main() {
 
     conn, err := grpc.NewClient(grpcConfig.Url, dialOpts...)
     if err != nil {
-        // Example of checking for specific error types using sentinel errors
-        if errors.IsConnectionError(err) {
-            log.Fatal("Failed to establish connection:", err)
-        } else {
-            log.Fatal("Unknown error:", err)
-        }
-    }
+		log.Fatal("Failed to create gRPC client:", err)
+	}
     defer func() {
         if closeErr := conn.Close(); closeErr != nil {
             log.Printf("Failed to close gRPC client: %v", closeErr)
@@ -83,7 +78,18 @@ func main() {
 
     response, err := client.Check(context.Background(), request)
     if err != nil {
-        log.Fatal(err)
+        if st, ok := status.FromError(err); ok {
+			switch st.Code() {
+			case codes.Unavailable:
+				log.Fatal("Service unavailable: ", err)
+			case codes.PermissionDenied:
+				log.Fatal("Permission denied: ", err)
+			default:
+				log.Fatal("gRPC connection error: ", err)
+			}
+		} else {
+			log.Fatal("Unknown error: ", err)
+		}
     }
 
     log.Printf("Check result: %v", response.Allowed)
@@ -105,23 +111,25 @@ grpcConfig := config.NewCompatibilityConfig(
 
 ## Error Handling
 
-The SDK provides rich error types for different failure scenarios:
+The SDK uses standard gRPC status codes:
 
 ```go
-import "github.com/project-kessel/kessel-sdk-go/kessel/errors"
-
-conn, err := grpc.NewClient(endpoint, dialOpts...)
+response, err := inventoryClient.Check(ctx, checkRequest)
 if err != nil {
-    if errors.IsConnectionError(err) {
-        log.Fatal("Failed to connect to server:", err)
+    if st, ok := status.FromError(err); ok {
+        switch st.Code() {
+        case codes.Unavailable:
+            log.Fatal("Service unavailable:", err)
+        case codes.PermissionDenied:
+            log.Fatal("Permission denied:", err)
+        default:
+            log.Fatal("gRPC connection error:", err)
+        }
     } else {
         log.Fatal("Unknown error:", err)
     }
 }
 ```
-
-Available error checkers:
-- `errors.IsConnectionError(err)` - Network/connection failures
 
 ## Examples
 

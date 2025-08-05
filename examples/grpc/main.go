@@ -6,10 +6,11 @@ import (
 	"log"
 
 	"github.com/project-kessel/kessel-sdk-go/kessel/config"
-	"github.com/project-kessel/kessel-sdk-go/kessel/errors"
 	v1beta2 "github.com/project-kessel/kessel-sdk-go/kessel/inventory/v1beta2"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/status"
 )
 
 func main() {
@@ -31,12 +32,7 @@ func main() {
 
 	conn, err := grpc.NewClient(grpcConfig.Url, dialOpts...)
 	if err != nil {
-		// Example of checking for specific error types using sentinel errors
-		if errors.IsConnectionError(err) {
-			log.Fatal("Failed to establish connection:", err)
-		} else {
-			log.Fatal("Unknown error:", err)
-		}
+		log.Fatal("Failed to create gRPC client:", err)
 	}
 	defer func() {
 		if closeErr := conn.Close(); closeErr != nil {
@@ -68,8 +64,18 @@ func main() {
 
 	response, err := inventoryClient.Check(ctx, checkRequest)
 	if err != nil {
-		fmt.Printf("Request failed with error: %v\n", err)
-		return
+		if st, ok := status.FromError(err); ok {
+			switch st.Code() {
+			case codes.Unavailable:
+				log.Fatal("Service unavailable: ", err)
+			case codes.PermissionDenied:
+				log.Fatal("Permission denied: ", err)
+			default:
+				log.Fatal("gRPC connection error: ", err)
+			}
+		} else {
+			log.Fatal("Unknown error: ", err)
+		}
 	}
 	fmt.Printf("Check response: %+v\n", response)
 }
