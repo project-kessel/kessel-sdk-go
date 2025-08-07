@@ -3,37 +3,40 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/project-kessel/kessel-sdk-go/kessel/inventory/v1beta2"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	credentials "google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/status"
 	"log"
 	"os"
 
 	_ "github.com/joho/godotenv/autoload"
 
-	"github.com/project-kessel/kessel-sdk-go/kessel/config"
-	v1beta2 "github.com/project-kessel/kessel-sdk-go/kessel/inventory/v1beta2"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/grpc/status"
+	"github.com/project-kessel/kessel-sdk-go/kessel/auth"
+	kesselgrpc "github.com/project-kessel/kessel-sdk-go/kessel/grpc"
 )
 
 func main() {
 	ctx := context.Background()
 
-	grpcConfig := config.NewCompatibilityConfig(
-		config.WithGRPCEndpoint(os.Getenv("KESSEL_ENDPOINT")),
-		config.WithGRPCInsecure(true),
-	)
+	discovered, err := auth.FetchOIDCDiscovery(auth.FetchOIDCDiscoveryOptions{
+		IssuerUrl:  os.Getenv("AUTH_DISCOVERY_ISSUER_URL"),
+		Context:    ctx, // Optionally specify a context - defaults to context.Background()
+		HttpClient: nil, // Optionally specify an http client - defaults to http.DefaultClient
+	})
+
+	if err != nil {
+		panic(err)
+	}
+
+	oauthCredentials := auth.MakeOAuth2ClientCredentials(os.Getenv("AUTH_CLIENT_ID"), os.Getenv("AUTH_CLIENT_SECRET"), discovered.TokenEndpoint)
 
 	var dialOpts []grpc.DialOption
+	dialOpts = append(dialOpts, grpc.WithTransportCredentials(credentials.NewTLS(nil)))
+	dialOpts = append(dialOpts, grpc.WithPerRPCCredentials(kesselgrpc.OAuth2CallCredentials(&oauthCredentials)))
 
-	dialOpts = append(dialOpts, grpc.WithTransportCredentials(insecure.NewCredentials()))
-
-	dialOpts = append(dialOpts,
-		grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcConfig.MaxReceiveMessageSize)),
-		grpc.WithDefaultCallOptions(grpc.MaxCallSendMsgSize(grpcConfig.MaxSendMessageSize)),
-	)
-
-	conn, err := grpc.NewClient(grpcConfig.Url, dialOpts...)
+	conn, err := grpc.NewClient(os.Getenv("KESSEL_ENDPOINT"), dialOpts...)
 	if err != nil {
 		log.Fatal("Failed to create gRPC client:", err)
 	}
