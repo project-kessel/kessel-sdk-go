@@ -20,8 +20,7 @@ import (
 func main() {
 	ctx := context.Background()
 
-	discovered, err := auth.FetchOIDCDiscovery(auth.FetchOIDCDiscoveryOptions{
-		IssuerUrl:  os.Getenv("AUTH_DISCOVERY_ISSUER_URL"),
+	discovered, err := auth.FetchOIDCDiscovery(os.Getenv("AUTH_DISCOVERY_ISSUER_URL"), auth.FetchOIDCDiscoveryOptions{
 		Context:    ctx, // Optionally specify a context - defaults to context.Background()
 		HttpClient: nil, // Optionally specify an http client - defaults to http.DefaultClient
 	})
