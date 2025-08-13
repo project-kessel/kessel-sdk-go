@@ -16,7 +16,7 @@ func OAuth2CallCredentials(auth *auth.OAuth2ClientCredentials) credentials.PerRP
 }
 
 func (o callCredentials) GetRequestMetadata(ctx context.Context, uri ...string) (map[string]string, error) {
-	token, err := o.credentials.GetToken(auth.GetTokenOptions{})
+	token, err := o.credentials.GetToken(ctx, auth.GetTokenOptions{})
 	if err != nil {
 		return nil, err
 	}

@@ -20,8 +20,7 @@ import (
 func main() {
 	ctx := context.Background()
 
-	discovered, err := auth.FetchOIDCDiscovery(os.Getenv("AUTH_DISCOVERY_ISSUER_URL"), auth.FetchOIDCDiscoveryOptions{
-		Context:    ctx, // Optionally specify a context - defaults to context.Background()
+	discovered, err := auth.FetchOIDCDiscovery(ctx, os.Getenv("AUTH_DISCOVERY_ISSUER_URL"), auth.FetchOIDCDiscoveryOptions{
 		HttpClient: nil, // Optionally specify an http client - defaults to http.DefaultClient
 	})
 
@@ -29,7 +28,7 @@ func main() {
 		panic(err)
 	}
 
-	oauthCredentials := auth.MakeOAuth2ClientCredentials(os.Getenv("AUTH_CLIENT_ID"), os.Getenv("AUTH_CLIENT_SECRET"), discovered.TokenEndpoint)
+	oauthCredentials := auth.NewOAuth2ClientCredentials(os.Getenv("AUTH_CLIENT_ID"), os.Getenv("AUTH_CLIENT_SECRET"), discovered.TokenEndpoint)
 
 	var dialOpts []grpc.DialOption
 	dialOpts = append(dialOpts, grpc.WithTransportCredentials(credentials.NewTLS(nil)))

@@ -30,14 +30,15 @@ type OAuth2ClientCredentials struct {
 }
 
 type FetchOIDCDiscoveryOptions struct {
-	Context    context.Context
+	// Optionally specify an http.Client or use http.DefaultClient
 	HttpClient *http.Client
 }
 
 type GetTokenOptions struct {
+	// Whether the token should be refreshed regardless if it is expired or not
 	ForceRefresh bool
-	Context      context.Context
-	HttpClient   *http.Client
+	// Optionally specify an http.Client or use http.DefaultClient
+	HttpClient *http.Client
 }
 
 type oauth2TokenEndpointCaller struct {
@@ -51,7 +52,7 @@ type requestToken struct {
 	GrantType    string `schema:"grant_type"`
 }
 
-func MakeOAuth2ClientCredentials(clientId string, clientSecret string, tokenEndpoint string) OAuth2ClientCredentials {
+func NewOAuth2ClientCredentials(clientId string, clientSecret string, tokenEndpoint string) OAuth2ClientCredentials {
 	return OAuth2ClientCredentials{
 		clientId:      clientId,
 		clientSecret:  clientSecret,
@@ -61,16 +62,12 @@ func MakeOAuth2ClientCredentials(clientId string, clientSecret string, tokenEndp
 	}
 }
 
-func FetchOIDCDiscovery(issuerUrl string, options FetchOIDCDiscoveryOptions) (OIDCDiscoveryMetadata, error) {
+func FetchOIDCDiscovery(ctx context.Context, issuerUrl string, options FetchOIDCDiscoveryOptions) (OIDCDiscoveryMetadata, error) {
 	if options.HttpClient == nil {
 		options.HttpClient = http.DefaultClient
 	}
 
-	if options.Context == nil {
-		options.Context = context.Background()
-	}
-
-	discoveryConfig, err := client.Discover(options.Context, issuerUrl, options.HttpClient)
+	discoveryConfig, err := client.Discover(ctx, issuerUrl, options.HttpClient)
 	if err != nil {
 		return OIDCDiscoveryMetadata{}, err
 	}
@@ -78,13 +75,9 @@ func FetchOIDCDiscovery(issuerUrl string, options FetchOIDCDiscoveryOptions) (OI
 	return OIDCDiscoveryMetadata{TokenEndpoint: discoveryConfig.TokenEndpoint}, nil
 }
 
-func (o *OAuth2ClientCredentials) GetToken(options GetTokenOptions) (RefreshTokenResponse, error) {
+func (o *OAuth2ClientCredentials) GetToken(ctx context.Context, options GetTokenOptions) (RefreshTokenResponse, error) {
 	if options.HttpClient == nil {
 		options.HttpClient = http.DefaultClient
-	}
-
-	if options.Context == nil {
-		options.Context = context.Background()
 	}
 
 	if !options.ForceRefresh && o.isTokenValid() {
@@ -99,7 +92,7 @@ func (o *OAuth2ClientCredentials) GetToken(options GetTokenOptions) (RefreshToke
 	}
 
 	var err error
-	o.cachedToken, err = o.refreshToken(options.Context, options.HttpClient)
+	o.cachedToken, err = o.refreshToken(ctx, options.HttpClient)
 
 	return o.cachedToken, err
 }

@@ -15,7 +15,7 @@ func TestMakeOAuth2ClientCredentials(t *testing.T) {
 	clientSecret := "test-client-secret"
 	tokenEndpoint := "https://example.com/token"
 
-	credentials := MakeOAuth2ClientCredentials(clientId, clientSecret, tokenEndpoint)
+	credentials := NewOAuth2ClientCredentials(clientId, clientSecret, tokenEndpoint)
 
 	if credentials.clientId != clientId {
 		t.Errorf("Expected clientId to be %s, got %s", clientId, credentials.clientId)
@@ -169,7 +169,7 @@ func TestOAuth2ClientCredentials_GetToken(t *testing.T) {
 				tokenEndpoint = server.URL
 			}
 
-			credentials := MakeOAuth2ClientCredentials("test-client", "test-secret", tokenEndpoint)
+			credentials := NewOAuth2ClientCredentials("test-client", "test-secret", tokenEndpoint)
 
 			// Setup cached token if provided
 			if tt.setupToken != nil {
@@ -220,7 +220,7 @@ func TestOAuth2ClientCredentials_GetToken_DefaultValues(t *testing.T) {
 	}))
 	defer server.Close()
 
-	credentials := MakeOAuth2ClientCredentials("test-client", "test-secret", server.URL)
+	credentials := NewOAuth2ClientCredentials("test-client", "test-secret", server.URL)
 
 	// Test with nil context and http client (should use defaults)
 	options := GetTokenOptions{
@@ -280,7 +280,7 @@ func TestOAuth2ClientCredentials_isTokenValid(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			credentials := MakeOAuth2ClientCredentials("test-client", "test-secret", "https://example.com/token")
+			credentials := NewOAuth2ClientCredentials("test-client", "test-secret", "https://example.com/token")
 			credentials.cachedToken = tt.token
 
 			result := credentials.isTokenValid()
@@ -343,7 +343,7 @@ func TestOAuth2ClientCredentials_refreshToken(t *testing.T) {
 			server := httptest.NewServer(http.HandlerFunc(tt.serverHandler))
 			defer server.Close()
 
-			credentials := MakeOAuth2ClientCredentials("test-client", "test-secret", server.URL)
+			credentials := NewOAuth2ClientCredentials("test-client", "test-secret", server.URL)
 
 			result, err := credentials.refreshToken(context.Background(), http.DefaultClient)
 
@@ -403,7 +403,7 @@ func TestConcurrentTokenAccess(t *testing.T) {
 	}))
 	defer server.Close()
 
-	credentials := MakeOAuth2ClientCredentials("test-client", "test-secret", server.URL)
+	credentials := NewOAuth2ClientCredentials("test-client", "test-secret", server.URL)
 
 	// Test concurrent access to GetToken
 	const numGoroutines = 5

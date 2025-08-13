@@ -9,7 +9,7 @@ import (
 
 func TestOAuth2CallCredentials(t *testing.T) {
 	// Create real OAuth2ClientCredentials for basic tests
-	authCreds := auth.MakeOAuth2ClientCredentials("test-client", "test-secret", "https://example.com/token")
+	authCreds := auth.NewOAuth2ClientCredentials("test-client", "test-secret", "https://example.com/token")
 	credentials := OAuth2CallCredentials(&authCreds)
 
 	// Test RequireTransportSecurity
@@ -20,7 +20,7 @@ func TestOAuth2CallCredentials(t *testing.T) {
 
 func TestCallCredentials_RequireTransportSecurity(t *testing.T) {
 	// Create OAuth2ClientCredentials (we don't need a real one for this test)
-	authCreds := auth.MakeOAuth2ClientCredentials("client", "secret", "https://example.com/token")
+	authCreds := auth.NewOAuth2ClientCredentials("client", "secret", "https://example.com/token")
 	credentials := OAuth2CallCredentials(&authCreds)
 
 	if !credentials.RequireTransportSecurity() {
@@ -30,7 +30,7 @@ func TestCallCredentials_RequireTransportSecurity(t *testing.T) {
 
 func TestCallCredentials_GetRequestMetadata_ErrorHandling(t *testing.T) {
 	// Test error handling when credentials return an error
-	authCreds := auth.MakeOAuth2ClientCredentials("client", "secret", "invalid-url")
+	authCreds := auth.NewOAuth2ClientCredentials("client", "secret", "invalid-url")
 	credentials := OAuth2CallCredentials(&authCreds)
 
 	callCreds, ok := credentials.(callCredentials)
@@ -52,7 +52,7 @@ func TestCallCredentials_GetRequestMetadata_ErrorHandling(t *testing.T) {
 
 func TestCallCredentials_GetRequestMetadata_WithMultipleURIs(t *testing.T) {
 	// Test that GetRequestMetadata can be called with multiple URIs
-	authCreds := auth.MakeOAuth2ClientCredentials("client", "secret", "invalid-url")
+	authCreds := auth.NewOAuth2ClientCredentials("client", "secret", "invalid-url")
 	credentials := OAuth2CallCredentials(&authCreds)
 
 	callCreds, ok := credentials.(callCredentials)
@@ -76,7 +76,7 @@ func TestCallCredentials_GetRequestMetadata_WithMultipleURIs(t *testing.T) {
 }
 
 func TestCallCredentials_GetRequestMetadata_WithContext(t *testing.T) {
-	authCreds := auth.MakeOAuth2ClientCredentials("client", "secret", "invalid-url")
+	authCreds := auth.NewOAuth2ClientCredentials("client", "secret", "invalid-url")
 	credentials := OAuth2CallCredentials(&authCreds)
 
 	callCreds, ok := credentials.(callCredentials)
@@ -97,7 +97,7 @@ func TestCallCredentials_GetRequestMetadata_WithContext(t *testing.T) {
 }
 
 func TestCallCredentials_GetRequestMetadata_ContextCancellation(t *testing.T) {
-	authCreds := auth.MakeOAuth2ClientCredentials("client", "secret", "invalid-url")
+	authCreds := auth.NewOAuth2ClientCredentials("client", "secret", "invalid-url")
 	credentials := OAuth2CallCredentials(&authCreds)
 
 	callCreds, ok := credentials.(callCredentials)
@@ -118,7 +118,7 @@ func TestCallCredentials_GetRequestMetadata_ContextCancellation(t *testing.T) {
 // Integration test that shows how the OAuth2CallCredentials would be used
 func TestOAuth2CallCredentials_Integration(t *testing.T) {
 	// Create real OAuth2ClientCredentials
-	authCreds := auth.MakeOAuth2ClientCredentials(
+	authCreds := auth.NewOAuth2ClientCredentials(
 		"test-client-id",
 		"test-client-secret",
 		"https://example.com/token",
@@ -142,7 +142,7 @@ func TestOAuth2CallCredentials_Integration(t *testing.T) {
 }
 
 func TestCallCredentials_TypeAssertion(t *testing.T) {
-	authCreds := auth.MakeOAuth2ClientCredentials("client", "secret", "https://example.com/token")
+	authCreds := auth.NewOAuth2ClientCredentials("client", "secret", "https://example.com/token")
 	grpcCreds := OAuth2CallCredentials(&authCreds)
 
 	// Verify that the returned credentials can be cast back to callCredentials
