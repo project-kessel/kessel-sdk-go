@@ -3,24 +3,36 @@ package main
 import (
 	"context"
 	"fmt"
+	"github.com/project-kessel/kessel-sdk-go/kessel/inventory/v1beta2"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
+	credentials "google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/status"
 	"log"
 	"os"
 
 	_ "github.com/joho/godotenv/autoload"
 
-	"github.com/project-kessel/kessel-sdk-go/kessel/inventory/v1beta2"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/grpc/status"
+	"github.com/project-kessel/kessel-sdk-go/kessel/auth"
+	kesselgrpc "github.com/project-kessel/kessel-sdk-go/kessel/grpc"
 )
 
 func main() {
 	ctx := context.Background()
 
-	var dialOpts []grpc.DialOption
+	discovered, err := auth.FetchOIDCDiscovery(ctx, os.Getenv("AUTH_DISCOVERY_ISSUER_URL"), auth.FetchOIDCDiscoveryOptions{
+		HttpClient: nil, // Optionally specify an http client - defaults to http.DefaultClient
+	})
 
-	dialOpts = append(dialOpts, grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		panic(err)
+	}
+
+	oauthCredentials := auth.NewOAuth2ClientCredentials(os.Getenv("AUTH_CLIENT_ID"), os.Getenv("AUTH_CLIENT_SECRET"), discovered.TokenEndpoint)
+
+	var dialOpts []grpc.DialOption
+	dialOpts = append(dialOpts, grpc.WithTransportCredentials(credentials.NewTLS(nil)))
+	dialOpts = append(dialOpts, grpc.WithPerRPCCredentials(kesselgrpc.OAuth2CallCredentials(&oauthCredentials)))
 
 	conn, err := grpc.NewClient(os.Getenv("KESSEL_ENDPOINT"), dialOpts...)
 	if err != nil {

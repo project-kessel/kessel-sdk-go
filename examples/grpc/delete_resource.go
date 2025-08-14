@@ -8,18 +8,19 @@ import (
 
 	_ "github.com/joho/godotenv/autoload"
 
-	"github.com/project-kessel/kessel-sdk-go/kessel/inventory/v1beta2"
+	v1beta2 "github.com/project-kessel/kessel-sdk-go/kessel/inventory/v1beta2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 )
 
+func addr[T any](t T) *T { return &t }
+
 func main() {
 	ctx := context.Background()
 
 	var dialOpts []grpc.DialOption
-
 	dialOpts = append(dialOpts, grpc.WithTransportCredentials(insecure.NewCredentials()))
 
 	conn, err := grpc.NewClient(os.Getenv("KESSEL_ENDPOINT"), dialOpts...)
@@ -34,27 +35,19 @@ func main() {
 
 	inventoryClient := v1beta2.NewKesselInventoryServiceClient(conn)
 
-	// Example request using the external API types
-	checkRequest := &v1beta2.CheckRequest{
-		Object: &v1beta2.ResourceReference{
+	deleteResourceRequest := &v1beta2.DeleteResourceRequest{
+		Reference: &v1beta2.ResourceReference{
 			ResourceType: "host",
-			ResourceId:   "1213",
+			ResourceId:   "854589f0-3be7-4cad-8bcd-45e18f33cb81",
 			Reporter: &v1beta2.ReporterReference{
-				Type: "HBI",
-			},
-		},
-		Relation: "member",
-		Subject: &v1beta2.SubjectReference{
-			Resource: &v1beta2.ResourceReference{
-				ResourceType: "user",
-				ResourceId:   "tim",
+				Type: "hbi",
 			},
 		},
 	}
 
-	fmt.Println("Making basic gRPC request:")
+	fmt.Println("Making delete resource request:")
 
-	response, err := inventoryClient.Check(ctx, checkRequest)
+	response, err := inventoryClient.DeleteResource(ctx, deleteResourceRequest)
 	if err != nil {
 		if st, ok := status.FromError(err); ok {
 			switch st.Code() {
@@ -69,5 +62,5 @@ func main() {
 			log.Fatal("Unknown error: ", err)
 		}
 	}
-	fmt.Printf("Check response: %+v\n", response)
+	fmt.Printf("Delete resource response: %+v\n", response)
 }
