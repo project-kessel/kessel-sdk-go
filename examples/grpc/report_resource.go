@@ -3,20 +3,19 @@ package main
 import (
 	"context"
 	"fmt"
-	"google.golang.org/protobuf/types/known/structpb"
 	"log"
 	"os"
 
+	"google.golang.org/protobuf/types/known/structpb"
+
 	_ "github.com/joho/godotenv/autoload"
 
-	v1beta2 "github.com/project-kessel/kessel-sdk-go/kessel/inventory/v1beta2"
+	"github.com/project-kessel/kessel-sdk-go/kessel/inventory/v1beta2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 )
-
-func addr[T any](t T) *T { return &t }
 
 func main() {
 	ctx := context.Background()
