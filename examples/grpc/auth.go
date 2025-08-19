@@ -3,13 +3,12 @@ package main
 import (
 	"context"
 	"fmt"
-	"github.com/project-kessel/kessel-sdk-go/kessel/inventory/v1beta2"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	credentials "google.golang.org/grpc/credentials"
-	"google.golang.org/grpc/status"
 	"log"
 	"os"
+
+	"github.com/project-kessel/kessel-sdk-go/kessel/inventory/v1beta2"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 
 	_ "github.com/joho/godotenv/autoload"
 
@@ -30,11 +29,9 @@ func main() {
 
 	oauthCredentials := auth.NewOAuth2ClientCredentials(os.Getenv("AUTH_CLIENT_ID"), os.Getenv("AUTH_CLIENT_SECRET"), discovered.TokenEndpoint)
 
-	var dialOpts []grpc.DialOption
-	dialOpts = append(dialOpts, grpc.WithTransportCredentials(credentials.NewTLS(nil)))
-	dialOpts = append(dialOpts, grpc.WithPerRPCCredentials(kesselgrpc.OAuth2CallCredentials(&oauthCredentials)))
-
-	conn, err := grpc.NewClient(os.Getenv("KESSEL_ENDPOINT"), dialOpts...)
+	inventoryClient, conn, err := v1beta2.NewClientBuilder(os.Getenv("KESSEL_ENDPOINT")).
+		Authenticated(kesselgrpc.OAuth2CallCredentials(&oauthCredentials), nil).
+		Build()
 	if err != nil {
 		log.Fatal("Failed to create gRPC client:", err)
 	}
@@ -43,8 +40,6 @@ func main() {
 			log.Printf("Failed to close gRPC client: %v", closeErr)
 		}
 	}()
-
-	inventoryClient := v1beta2.NewKesselInventoryServiceClient(conn)
 
 	// Example request using the external API types
 	checkRequest := &v1beta2.CheckRequest{
