@@ -15,10 +15,7 @@ type ClientBuilder[C any] struct {
 	target             string
 	channelCredentials credentials.TransportCredentials
 	perRPCCredentials  credentials.PerRPCCredentials
-	defaultCallOptions []grpc.CallOption
 	insecure           bool
-	extraDialOptions   []grpc.DialOption
-	extraCallOptions   []grpc.CallOption
 	newStub            func(grpc.ClientConnInterface) C
 }
 
@@ -26,10 +23,6 @@ func NewClientBuilder[C any](target string, newStub func(grpc.ClientConnInterfac
 	return &ClientBuilder[C]{
 		target:             target,
 		channelCredentials: credentials.NewTLS(&tls.Config{}),
-		defaultCallOptions: []grpc.CallOption{
-			grpc.MaxCallRecvMsgSize(4 * 1024 * 1024),
-			grpc.MaxCallSendMsgSize(4 * 1024 * 1024),
-		},
 		newStub: newStub,
 	}
 }
@@ -67,16 +60,6 @@ func (b *ClientBuilder[C]) Insecure() *ClientBuilder[C] {
 	return b
 }
 
-func (b *ClientBuilder[C]) WithDialOption(opt grpc.DialOption) *ClientBuilder[C] {
-	b.extraDialOptions = append(b.extraDialOptions, opt)
-	return b
-}
-
-func (b *ClientBuilder[C]) WithCallOption(opt grpc.CallOption) *ClientBuilder[C] {
-	b.extraCallOptions = append(b.extraCallOptions, opt)
-	return b
-}
-
 func (b *ClientBuilder[C]) Build() (C, *grpc.ClientConn, error) {
 	var zero C
 	if b.target == "" {
@@ -91,15 +74,10 @@ func (b *ClientBuilder[C]) Build() (C, *grpc.ClientConn, error) {
 	var dialOpts []grpc.DialOption
 	// Transport security (TLS or insecure)
 	dialOpts = append(dialOpts, grpc.WithTransportCredentials(b.channelCredentials))
-	// Default call options
-	callOpts := append([]grpc.CallOption{}, b.defaultCallOptions...)
+	// Apply only internal auth call credentials, no external customization hooks
 	if b.perRPCCredentials != nil {
-		callOpts = append(callOpts, grpc.PerRPCCredentials(b.perRPCCredentials))
+		dialOpts = append(dialOpts, grpc.WithDefaultCallOptions(grpc.PerRPCCredentials(b.perRPCCredentials)))
 	}
-	callOpts = append(callOpts, b.extraCallOptions...)
-	dialOpts = append(dialOpts, grpc.WithDefaultCallOptions(callOpts...))
-	// Extra dial options
-	dialOpts = append(dialOpts, b.extraDialOptions...)
 
 	conn, err := grpc.NewClient(b.target, dialOpts...)
 	if err != nil {
