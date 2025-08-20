@@ -15,7 +15,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func main() {
+func reportResource() {
 	ctx := context.Background()
 
 	inventoryClient, conn, err := v1beta2.NewClientBuilder(os.Getenv("KESSEL_ENDPOINT")).

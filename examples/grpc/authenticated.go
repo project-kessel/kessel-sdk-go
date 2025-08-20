@@ -16,9 +16,9 @@ import (
 	kesselgrpc "github.com/project-kessel/kessel-sdk-go/kessel/grpc"
 )
 
-func main() {
-	ctx := context.Background()
+func authenticated() {
 
+	ctx := context.Background()
 	discovered, err := auth.FetchOIDCDiscovery(ctx, os.Getenv("AUTH_DISCOVERY_ISSUER_URL"), auth.FetchOIDCDiscoveryOptions{
 		HttpClient: nil, // Optionally specify an http client - defaults to http.DefaultClient
 	})

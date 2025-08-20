@@ -6,18 +6,13 @@ import (
 	"log"
 	"os"
 
-	_ "github.com/joho/godotenv/autoload"
-
 	"github.com/project-kessel/kessel-sdk-go/kessel/inventory/v1beta2"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
-func addr[T any](t T) *T { return &t }
-
-func deleteResource() {
+func insecure() {
 	ctx := context.Background()
-
 	inventoryClient, conn, err := v1beta2.NewClientBuilder(os.Getenv("KESSEL_ENDPOINT")).
 		Insecure().
 		Build()
@@ -30,19 +25,27 @@ func deleteResource() {
 		}
 	}()
 
-	deleteResourceRequest := &v1beta2.DeleteResourceRequest{
-		Reference: &v1beta2.ResourceReference{
+	// Example request using the external API types
+	checkRequest := &v1beta2.CheckRequest{
+		Object: &v1beta2.ResourceReference{
 			ResourceType: "host",
-			ResourceId:   "854589f0-3be7-4cad-8bcd-45e18f33cb81",
+			ResourceId:   "1213",
 			Reporter: &v1beta2.ReporterReference{
-				Type: "hbi",
+				Type: "HBI",
+			},
+		},
+		Relation: "member",
+		Subject: &v1beta2.SubjectReference{
+			Resource: &v1beta2.ResourceReference{
+				ResourceType: "user",
+				ResourceId:   "tim",
 			},
 		},
 	}
 
-	fmt.Println("Making delete resource request:")
+	fmt.Println("Making basic gRPC request:")
 
-	response, err := inventoryClient.DeleteResource(ctx, deleteResourceRequest)
+	response, err := inventoryClient.Check(ctx, checkRequest)
 	if err != nil {
 		if st, ok := status.FromError(err); ok {
 			switch st.Code() {
@@ -57,5 +60,5 @@ func deleteResource() {
 			log.Fatal("Unknown error: ", err)
 		}
 	}
-	fmt.Printf("Delete resource response: %+v\n", response)
+	fmt.Printf("Check response: %+v\n", response)
 }
