@@ -6,23 +6,16 @@ import (
 	"log"
 	"os"
 
-	_ "github.com/joho/godotenv/autoload"
-
 	"github.com/project-kessel/kessel-sdk-go/kessel/inventory/v1beta2"
-	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 )
 
-func main() {
+func insecure() {
 	ctx := context.Background()
-
-	var dialOpts []grpc.DialOption
-
-	dialOpts = append(dialOpts, grpc.WithTransportCredentials(insecure.NewCredentials()))
-
-	conn, err := grpc.NewClient(os.Getenv("KESSEL_ENDPOINT"), dialOpts...)
+	inventoryClient, conn, err := v1beta2.NewClientBuilder(os.Getenv("KESSEL_ENDPOINT")).
+		Insecure().
+		Build()
 	if err != nil {
 		log.Fatal("Failed to create gRPC client:", err)
 	}
@@ -31,8 +24,6 @@ func main() {
 			log.Printf("Failed to close gRPC client: %v", closeErr)
 		}
 	}()
-
-	inventoryClient := v1beta2.NewKesselInventoryServiceClient(conn)
 
 	// Example request using the external API types
 	checkRequest := &v1beta2.CheckRequest{
@@ -71,3 +62,5 @@ func main() {
 	}
 	fmt.Printf("Check response: %+v\n", response)
 }
+
+func main() { insecure() }

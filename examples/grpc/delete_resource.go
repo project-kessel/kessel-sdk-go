@@ -8,22 +8,19 @@ import (
 
 	_ "github.com/joho/godotenv/autoload"
 
-	v1beta2 "github.com/project-kessel/kessel-sdk-go/kessel/inventory/v1beta2"
-	"google.golang.org/grpc"
+	"github.com/project-kessel/kessel-sdk-go/kessel/inventory/v1beta2"
 	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/status"
 )
 
 func addr[T any](t T) *T { return &t }
 
-func main() {
+func deleteResource() {
 	ctx := context.Background()
 
-	var dialOpts []grpc.DialOption
-	dialOpts = append(dialOpts, grpc.WithTransportCredentials(insecure.NewCredentials()))
-
-	conn, err := grpc.NewClient(os.Getenv("KESSEL_ENDPOINT"), dialOpts...)
+	inventoryClient, conn, err := v1beta2.NewClientBuilder(os.Getenv("KESSEL_ENDPOINT")).
+		Insecure().
+		Build()
 	if err != nil {
 		log.Fatal("Failed to create gRPC client:", err)
 	}
@@ -32,8 +29,6 @@ func main() {
 			log.Printf("Failed to close gRPC client: %v", closeErr)
 		}
 	}()
-
-	inventoryClient := v1beta2.NewKesselInventoryServiceClient(conn)
 
 	deleteResourceRequest := &v1beta2.DeleteResourceRequest{
 		Reference: &v1beta2.ResourceReference{
@@ -64,3 +59,5 @@ func main() {
 	}
 	fmt.Printf("Delete resource response: %+v\n", response)
 }
+
+func main() { deleteResource() }
