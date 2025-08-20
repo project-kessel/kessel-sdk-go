@@ -76,3 +76,7 @@ func reportResource() {
 	}
 	fmt.Printf("Report resource response: %+v\n", response)
 }
+
+func addr[T any](t T) *T { return &t }
+
+func main() { reportResource() }

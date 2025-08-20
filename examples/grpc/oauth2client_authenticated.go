@@ -76,3 +76,5 @@ func oauth2clientauthenticated() {
 	}
 	fmt.Printf("Check response: %+v\n", response)
 }
+
+func main() { oauth2clientauthenticated() }

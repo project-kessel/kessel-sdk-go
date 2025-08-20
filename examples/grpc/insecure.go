@@ -62,3 +62,5 @@ func insecure() {
 	}
 	fmt.Printf("Check response: %+v\n", response)
 }
+
+func main() { insecure() }

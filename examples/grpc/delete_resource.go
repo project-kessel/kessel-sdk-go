@@ -59,3 +59,5 @@ func deleteResource() {
 	}
 	fmt.Printf("Delete resource response: %+v\n", response)
 }
+
+func main() { deleteResource() }

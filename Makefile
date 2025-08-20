@@ -20,7 +20,11 @@ help: ## Display this help screen
 .PHONY: build
 build: .env ## Build example binaries
 	@echo "Building gRPC examples"
-	@go build -o bin/grpc-examples ./examples/grpc
+	@go build -o bin/insecure-example ./examples/grpc/insecure.go
+	@go build -o bin/authenticated-example ./examples/grpc/authenticated.go
+	@go build -o bin/oauth2client-authenticated-example ./examples/grpc/oauth2client_authenticated.go
+	@go build -o bin/report-resource-example ./examples/grpc/report_resource.go
+	@go build -o bin/delete-resource-example ./examples/grpc/delete_resource.go
 
 .PHONY: lint
 lint: ## Run golangci-lint

@@ -6,14 +6,11 @@ import (
 	"log"
 	"os"
 
+	"github.com/project-kessel/kessel-sdk-go/kessel/auth"
+	kesselgrpc "github.com/project-kessel/kessel-sdk-go/kessel/grpc"
 	"github.com/project-kessel/kessel-sdk-go/kessel/inventory/v1beta2"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-
-	_ "github.com/joho/godotenv/autoload"
-
-	"github.com/project-kessel/kessel-sdk-go/kessel/auth"
-	kesselgrpc "github.com/project-kessel/kessel-sdk-go/kessel/grpc"
 )
 
 func authenticated() {
@@ -78,3 +75,5 @@ func authenticated() {
 	}
 	fmt.Printf("Check response: %+v\n", response)
 }
+
+func main() { authenticated() }
