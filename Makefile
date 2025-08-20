@@ -19,11 +19,8 @@ help: ## Display this help screen
 
 .PHONY: build
 build: .env ## Build example binaries
-	@echo "Building gRPC example"
-	@go build -o bin/grpc-example examples/grpc/main.go
-	@go build -o bin/auth-grpc-example examples/grpc/auth.go
-	@go build -o bin/report-resource-example examples/grpc/report_resource.go
-	@go build -o bin/delete-resource-example examples/grpc/delete_resource.go
+	@echo "Building gRPC examples"
+	@go build -o bin/grpc-examples ./examples/grpc
 
 .PHONY: lint
 lint: ## Run golangci-lint
