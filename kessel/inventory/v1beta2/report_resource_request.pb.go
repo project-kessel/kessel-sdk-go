@@ -60,8 +60,10 @@ type ReportResourceRequest struct {
 	// Use `IMMEDIATE` only if your use case requires strong consistency guarantees
 	// (e.g., writing and immediately checking access to the resource).
 	WriteVisibility WriteVisibility `protobuf:"varint,6,opt,name=write_visibility,json=writeVisibility,proto3,enum=kessel.inventory.v1beta2.WriteVisibility" json:"write_visibility,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+	// Temporary flag for easy testing
+	UseNew        bool `protobuf:"varint,7,opt,name=use_new,json=useNew,proto3" json:"use_new,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *ReportResourceRequest) Reset() {
@@ -136,18 +138,26 @@ func (x *ReportResourceRequest) GetWriteVisibility() WriteVisibility {
 	return WriteVisibility_WRITE_VISIBILITY_UNSPECIFIED
 }
 
+func (x *ReportResourceRequest) GetUseNew() bool {
+	if x != nil {
+		return x.UseNew
+	}
+	return false
+}
+
 var File_kessel_inventory_v1beta2_report_resource_request_proto protoreflect.FileDescriptor
 
 const file_kessel_inventory_v1beta2_report_resource_request_proto_rawDesc = "" +
 	"\n" +
-	"6kessel/inventory/v1beta2/report_resource_request.proto\x12\x18kessel.inventory.v1beta2\x1a7kessel/inventory/v1beta2/resource_representations.proto\x1a/kessel/inventory/v1beta2/write_visibility.proto\x1a\x1bbuf/validate/validate.proto\"\xbf\x03\n" +
+	"6kessel/inventory/v1beta2/report_resource_request.proto\x12\x18kessel.inventory.v1beta2\x1a7kessel/inventory/v1beta2/resource_representations.proto\x1a/kessel/inventory/v1beta2/write_visibility.proto\x1a\x1bbuf/validate/validate.proto\"\xd8\x03\n" +
 	"\x15ReportResourceRequest\x12&\n" +
 	"\finventory_id\x18\x01 \x01(\tH\x00R\vinventoryId\x88\x01\x01\x12-\n" +
 	"\x04type\x18\x02 \x01(\tB\x19\xbaH\x16r\x14\x10\x012\x10^[A-Za-z0-9_-]+$R\x04type\x12>\n" +
 	"\rreporter_type\x18\x03 \x01(\tB\x19\xbaH\x16r\x14\x10\x012\x10^[A-Za-z0-9_-]+$R\freporterType\x129\n" +
 	"\x14reporter_instance_id\x18\x04 \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x12reporterInstanceId\x12c\n" +
 	"\x0frepresentations\x18\x05 \x01(\v21.kessel.inventory.v1beta2.ResourceRepresentationsB\x06\xbaH\x03\xc8\x01\x01R\x0frepresentations\x12^\n" +
-	"\x10write_visibility\x18\x06 \x01(\x0e2).kessel.inventory.v1beta2.WriteVisibilityB\b\xbaH\x05\x82\x01\x02\x10\x01R\x0fwriteVisibilityB\x0f\n" +
+	"\x10write_visibility\x18\x06 \x01(\x0e2).kessel.inventory.v1beta2.WriteVisibilityB\b\xbaH\x05\x82\x01\x02\x10\x01R\x0fwriteVisibility\x12\x17\n" +
+	"\ause_new\x18\a \x01(\bR\x06useNewB\x0f\n" +
 	"\r_inventory_idBr\n" +
 	"(org.project_kessel.api.inventory.v1beta2P\x01ZDgithub.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2b\x06proto3"
 
