@@ -1,4 +1,4 @@
-package inventory
+package builder
 
 import (
 	"context"
@@ -11,6 +11,8 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
+// ClientBuilder is a generic builder that constructs a typed gRPC client stub and its connection.
+// C is the client interface type (e.g., v1beta2.KesselInventoryServiceClient).
 type ClientBuilder[C any] struct {
 	target             string
 	channelCredentials credentials.TransportCredentials
@@ -23,14 +25,21 @@ func NewClientBuilder[C any](target string, newStub func(grpc.ClientConnInterfac
 	return &ClientBuilder[C]{
 		target:             target,
 		channelCredentials: credentials.NewTLS(&tls.Config{}),
-		newStub: newStub,
+		newStub:            newStub,
+	}
+}
+
+func (b *ClientBuilder[C]) setChannelCredentialsOrDefault(channelCredentials credentials.TransportCredentials) {
+	b.insecure = false
+	if channelCredentials != nil {
+		b.channelCredentials = channelCredentials
+	} else {
+		b.channelCredentials = credentials.NewTLS(&tls.Config{})
 	}
 }
 
 func (b *ClientBuilder[C]) OAuth2ClientAuthenticated(oAuth2ClientCredentials *auth.OAuth2ClientCredentials, channelCredentials credentials.TransportCredentials) *ClientBuilder[C] {
-	if channelCredentials != nil {
-		b.channelCredentials = channelCredentials
-	}
+	b.setChannelCredentialsOrDefault(channelCredentials)
 	if oAuth2ClientCredentials != nil {
 		b.perRPCCredentials = &oauth2PerRPCCreds{creds: oAuth2ClientCredentials, insecure: b.insecure}
 	}
@@ -39,17 +48,13 @@ func (b *ClientBuilder[C]) OAuth2ClientAuthenticated(oAuth2ClientCredentials *au
 
 func (b *ClientBuilder[C]) Authenticated(callCredentials credentials.PerRPCCredentials, channelCredentials credentials.TransportCredentials) *ClientBuilder[C] {
 	b.perRPCCredentials = callCredentials
-	if channelCredentials != nil {
-		b.channelCredentials = channelCredentials
-	}
+	b.setChannelCredentialsOrDefault(channelCredentials)
 	return b
 }
 
 func (b *ClientBuilder[C]) Unauthenticated(channelCredentials credentials.TransportCredentials) *ClientBuilder[C] {
 	b.perRPCCredentials = nil
-	if channelCredentials != nil {
-		b.channelCredentials = channelCredentials
-	}
+	b.setChannelCredentialsOrDefault(channelCredentials)
 	return b
 }
 
@@ -64,11 +69,6 @@ func (b *ClientBuilder[C]) Build() (C, *grpc.ClientConn, error) {
 	var zero C
 	if b.target == "" {
 		return zero, nil, fmt.Errorf("target URI is required")
-	}
-
-	// Disallow auth credentials over insecure transport to mirror Python builder semantics
-	if b.insecure && b.perRPCCredentials != nil {
-		return zero, nil, fmt.Errorf("invalid credential configuration: cannot authenticate with insecure channel")
 	}
 
 	var dialOpts []grpc.DialOption

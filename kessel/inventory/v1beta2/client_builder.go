@@ -1,11 +1,11 @@
 package v1beta2
 
 import (
-	"github.com/project-kessel/kessel-sdk-go/kessel/inventory"
+	genericBuilder "github.com/project-kessel/kessel-sdk-go/kessel/inventory/internal/builder"
 )
 
-type ClientBuilder = inventory.ClientBuilder[KesselInventoryServiceClient]
+type ClientBuilder = genericBuilder.ClientBuilder[KesselInventoryServiceClient]
 
 func NewClientBuilder(target string) *ClientBuilder {
-	return inventory.NewClientBuilder[KesselInventoryServiceClient](target, NewKesselInventoryServiceClient)
+	return genericBuilder.NewClientBuilder[KesselInventoryServiceClient](target, NewKesselInventoryServiceClient)
 }
