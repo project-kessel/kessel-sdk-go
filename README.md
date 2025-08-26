@@ -186,7 +186,7 @@ make test-coverage
 
 ## Release Instructions
 
-This section provides step-by-step instructions for maintainers to release a new version of the Kessel SDK for Python.
+This section provides step-by-step instructions for maintainers to release a new version of the Kessel SDK for Go.
 
 ### Version Management
 
