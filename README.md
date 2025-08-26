@@ -155,7 +155,7 @@ make build
 
 ### Prerequisites
 
-- Go 1.21 or later
+- Go 1.23 or later
 - Docker or Podman (for linting)
 - Protocol Buffers compiler (for code generation)
 
@@ -183,3 +183,74 @@ make test-coverage
 | Target | Description |
 |--------|-------------|
 | `make help` | Display all available targets |
+
+## Release Instructions
+
+This section provides step-by-step instructions for maintainers to release a new version of the Kessel SDK for Python.
+
+### Version Management
+
+This project follows [Semantic Versioning 2.0.0](https://semver.org/). Version numbers use the format `MAJOR.MINOR.PATCH`:
+
+- **MAJOR**: Increment for incompatible API changes
+- **MINOR**: Increment for backward-compatible functionality additions
+- **PATCH**: Increment for backward-compatible bug fixes
+
+**Note**: SDK versions across different languages (Ruby, Python, Go, etc.) do not need to be synchronized. Each language SDK can evolve independently based on its specific requirements and release schedule.
+
+### Prerequisites for Release
+
+- Write access to the GitHub repository
+- Ensure quality checks are passing
+- Review and update CHANGELOG or release notes as needed
+- Go 1.23 or higher
+- [buf](https://github.com/bufbuild/buf) for protobuf/gRPC code generation:
+  ```bash
+  # On macOS
+  brew install bufbuild/buf/buf
+  
+  # On Linux
+  curl -sSL "https://github.com/bufbuild/buf/releases/latest/download/buf-$(uname -s)-$(uname -m)" -o "/usr/local/bin/buf" && chmod +x "/usr/local/bin/buf"
+  ```
+
+### Release Process
+
+1. **Update Dependencies (if needed)**
+
+```bash
+# Regenerate gRPC code if there are updates to the Kessel Inventory API
+make generate
+```
+
+2. **Run Quality Checks**
+
+```bash
+# Run linting
+make lint
+
+# Run tests
+make test
+
+# Build examples
+make build
+```
+
+3. **Tag the Release**
+
+```bash
+# Create and push a git tag
+git tag -a vX.Y.Z -m "Release version X.Y.Z"
+git push origin vX.Y.Z
+```
+
+4. **Create GitHub Release**
+
+- Go to the [GitHub Releases page](https://github.com/project-kessel/kessel-sdk-go/releases)
+- Click "Create a new release"
+- Select the tag you just created
+- Add release notes describing the changes
+- Publish the release
+
+## License
+
+This project is licensed under the Apache License 2.0 - see the [LICENSE](LICENSE) file for details.
