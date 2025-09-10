@@ -142,11 +142,12 @@ var File_kessel_inventory_v1beta1_relationships_k8spolicy_ispropagatedto_k8sclus
 
 const file_kessel_inventory_v1beta1_relationships_k8spolicy_ispropagatedto_k8scluster_detail_proto_rawDesc = "" +
 	"\n" +
-	"Wkessel/inventory/v1beta1/relationships/k8spolicy_ispropagatedto_k8scluster_detail.proto\x12&kessel.inventory.v1beta1.relationships\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1bbuf/validate/validate.proto\"\xdf\x02\n" +
+	"Wkessel/inventory/v1beta1/relationships/k8spolicy_ispropagatedto_k8scluster_detail.proto\x12&kessel.inventory.v1beta1.relationships\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1bbuf/validate/validate.proto\"\xde\x02\n" +
 	"'K8SPolicyIsPropagatedToK8SClusterDetail\x12,\n" +
 	"\rk8s_policy_id\x18\xb8\xb1\xcek \x01(\tB\x03\xe0A\x03R\rk8s_policy_id\x12.\n" +
-	"\x0ek8s_cluster_id\x18\x80\xcb\xc9r \x01(\tB\x03\xe0A\x03R\x0ek8s_cluster_id\x12\x7f\n" +
-	"\x06status\x18\x8f\xe0ȩ\x01 \x01(\x0e2V.kessel.inventory.v1beta1.relationships.K8SPolicyIsPropagatedToK8SClusterDetail.StatusB\v\xbaH\b\x82\x01\x05\x10\x01\"\x01\x00R\x06status\"U\n" +
+	"\x0ek8s_cluster_id\x18\x80\xcb\xc9r \x01(\tB\x03\xe0A\x03R\x0ek8s_cluster_id\x12~\n" +
+	"\x06status\x18\x8f\xe0ȩ\x01 \x01(\x0e2V.kessel.inventory.v1beta1.relationships.K8SPolicyIsPropagatedToK8SClusterDetail.StatusB\n" +
+	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x06status\"U\n" +
 	"\x06Status\x12\x16\n" +
 	"\x12STATUS_UNSPECIFIED\x10\x00\x12\x10\n" +
 	"\fSTATUS_OTHER\x10\x01\x12\x0e\n" +

@@ -187,9 +187,10 @@ var File_kessel_inventory_v1beta1_relationships_reporter_data_proto protoreflect
 
 const file_kessel_inventory_v1beta1_relationships_reporter_data_proto_rawDesc = "" +
 	"\n" +
-	":kessel/inventory/v1beta1/relationships/reporter_data.proto\x12&kessel.inventory.v1beta1.relationships\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bbuf/validate/validate.proto\"\x94\x05\n" +
-	"\fReporterData\x12w\n" +
-	"\rreporter_type\x18ُ\x99u \x01(\x0e2A.kessel.inventory.v1beta1.relationships.ReporterData.ReporterTypeB\v\xbaH\b\x82\x01\x05\x10\x01\"\x01\x00R\rreporter_type\x12:\n" +
+	":kessel/inventory/v1beta1/relationships/reporter_data.proto\x12&kessel.inventory.v1beta1.relationships\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1fgoogle/protobuf/timestamp.proto\x1a\x1bbuf/validate/validate.proto\"\x93\x05\n" +
+	"\fReporterData\x12v\n" +
+	"\rreporter_type\x18ُ\x99u \x01(\x0e2A.kessel.inventory.v1beta1.relationships.ReporterData.ReporterTypeB\n" +
+	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\rreporter_type\x12:\n" +
 	"\x14reporter_instance_id\x18\xba\xd5\xfar \x01(\tB\x03\xe0A\x03R\x14reporter_instance_id\x12.\n" +
 	"\x10reporter_version\x18\xfb\xeeȀ\x01 \x01(\tR\x10reporter_version\x12J\n" +
 	"\x0efirst_reported\x18\x81\xed\xce\x06 \x01(\v2\x1a.google.protobuf.TimestampB\x03\xe0A\x03R\x0efirst_reported\x12I\n" +
