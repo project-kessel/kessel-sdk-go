@@ -178,9 +178,10 @@ var File_kessel_inventory_v1beta1_resources_reporter_data_proto protoreflect.Fil
 
 const file_kessel_inventory_v1beta1_resources_reporter_data_proto_rawDesc = "" +
 	"\n" +
-	"6kessel/inventory/v1beta1/resources/reporter_data.proto\x12\"kessel.inventory.v1beta1.resources\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1bbuf/validate/validate.proto\"\xe7\x03\n" +
-	"\fReporterData\x12s\n" +
-	"\rreporter_type\x18؏\x99u \x01(\x0e2=.kessel.inventory.v1beta1.resources.ReporterData.ReporterTypeB\v\xbaH\b\x82\x01\x05\x10\x01\"\x01\x00R\rreporter_type\x12:\n" +
+	"6kessel/inventory/v1beta1/resources/reporter_data.proto\x12\"kessel.inventory.v1beta1.resources\x1a\x1fgoogle/api/field_behavior.proto\x1a\x1bbuf/validate/validate.proto\"\xe6\x03\n" +
+	"\fReporterData\x12r\n" +
+	"\rreporter_type\x18؏\x99u \x01(\x0e2=.kessel.inventory.v1beta1.resources.ReporterData.ReporterTypeB\n" +
+	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\rreporter_type\x12:\n" +
 	"\x14reporter_instance_id\x18\xb8\xd5\xfar \x01(\tB\x03\xe0A\x03R\x14reporter_instance_id\x12%\n" +
 	"\fconsole_href\x18\x94\xa2\xc6E \x01(\tR\fconsole_href\x12\x1e\n" +
 	"\bapi_href\x18\xb1\xfc\x91\xcd\x01 \x01(\tR\bapi_href\x129\n" +

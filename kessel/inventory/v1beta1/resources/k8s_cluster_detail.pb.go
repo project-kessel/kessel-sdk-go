@@ -351,16 +351,19 @@ var File_kessel_inventory_v1beta1_resources_k8s_cluster_detail_proto protoreflec
 
 const file_kessel_inventory_v1beta1_resources_k8s_cluster_detail_proto_rawDesc = "" +
 	"\n" +
-	";kessel/inventory/v1beta1/resources/k8s_cluster_detail.proto\x12\"kessel.inventory.v1beta1.resources\x1aGkessel/inventory/v1beta1/resources/k8s_cluster_detail_nodes_inner.proto\x1a\x1bbuf/validate/validate.proto\"\xd1\n" +
+	";kessel/inventory/v1beta1/resources/k8s_cluster_detail.proto\x12\"kessel.inventory.v1beta1.resources\x1aGkessel/inventory/v1beta1/resources/k8s_cluster_detail_nodes_inner.proto\x1a\x1bbuf/validate/validate.proto\"\xce\n" +
 	"\n" +
 	"\x10K8sClusterDetail\x12<\n" +
-	"\x13external_cluster_id\x18\x8d\xcb\xd9h \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x13external_cluster_id\x12{\n" +
-	"\x0ecluster_status\x18\xd8ۍ\xee\x01 \x01(\x0e2B.kessel.inventory.v1beta1.resources.K8sClusterDetail.ClusterStatusB\v\xbaH\b\x82\x01\x05\x10\x01\"\x01\x00R\x0ecluster_status\x12e\n" +
+	"\x13external_cluster_id\x18\x8d\xcb\xd9h \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x13external_cluster_id\x12z\n" +
+	"\x0ecluster_status\x18\xd8ۍ\xee\x01 \x01(\x0e2B.kessel.inventory.v1beta1.resources.K8sClusterDetail.ClusterStatusB\n" +
+	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x0ecluster_status\x12e\n" +
 	"\x0ecluster_reason\x18\xd9ۍ\xee\x01 \x01(\tB4\xbaH1r/\x10\x01\x18\x80\b2(^[A-Za-z]([A-Za-z0-9_,:]*[A-Za-z0-9_])?$H\x00R\x0ecluster_reason\x88\x01\x01\x12&\n" +
-	"\fkube_version\x18\xba\xa4\xe1\xbc\x01 \x01(\tR\fkube_version\x12q\n" +
-	"\vkube_vendor\x18\x9a\xfd\xfc} \x01(\x0e2?.kessel.inventory.v1beta1.resources.K8sClusterDetail.KubeVendorB\v\xbaH\b\x82\x01\x05\x10\x01\"\x01\x00R\vkube_vendor\x122\n" +
-	"\x0evendor_version\x18\xe3\xc1\xb6\v \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x0evendor_version\x12{\n" +
-	"\x0ecloud_platform\x18\xbeΫ\xe3\x01 \x01(\x0e2B.kessel.inventory.v1beta1.resources.K8sClusterDetail.CloudPlatformB\v\xbaH\b\x82\x01\x05\x10\x01\"\x01\x00R\x0ecloud_platform\x12W\n" +
+	"\fkube_version\x18\xba\xa4\xe1\xbc\x01 \x01(\tR\fkube_version\x12p\n" +
+	"\vkube_vendor\x18\x9a\xfd\xfc} \x01(\x0e2?.kessel.inventory.v1beta1.resources.K8sClusterDetail.KubeVendorB\n" +
+	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\vkube_vendor\x122\n" +
+	"\x0evendor_version\x18\xe3\xc1\xb6\v \x01(\tB\a\xbaH\x04r\x02\x10\x01R\x0evendor_version\x12z\n" +
+	"\x0ecloud_platform\x18\xbeΫ\xe3\x01 \x01(\x0e2B.kessel.inventory.v1beta1.resources.K8sClusterDetail.CloudPlatformB\n" +
+	"\xbaH\a\x82\x01\x04\x10\x01 \x00R\x0ecloud_platform\x12W\n" +
 	"\x05nodes\x18\x91\xc5\xfc# \x03(\v2>.kessel.inventory.v1beta1.resources.K8sClusterDetailNodesInnerR\x05nodes\"m\n" +
 	"\rClusterStatus\x12\x1e\n" +
 	"\x1aCLUSTER_STATUS_UNSPECIFIED\x10\x00\x12\x18\n" +

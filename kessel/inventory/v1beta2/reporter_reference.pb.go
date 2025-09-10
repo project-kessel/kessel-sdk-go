@@ -78,10 +78,10 @@ var File_kessel_inventory_v1beta2_reporter_reference_proto protoreflect.FileDesc
 
 const file_kessel_inventory_v1beta2_reporter_reference_proto_rawDesc = "" +
 	"\n" +
-	"1kessel/inventory/v1beta2/reporter_reference.proto\x12\x18kessel.inventory.v1beta2\x1a\x1bbuf/validate/validate.proto\"\x8f\x01\n" +
+	"1kessel/inventory/v1beta2/reporter_reference.proto\x12\x18kessel.inventory.v1beta2\x1a\x1bbuf/validate/validate.proto\"\xcf\x01\n" +
 	"\x11ReporterReference\x12,\n" +
-	"\x04type\x18\x01 \x01(\tB\x18\xbaH\x15r\x13\x10\x012\x0f^[A-Za-z0-9_]+$R\x04type\x12<\n" +
-	"\vinstance_id\x18\x02 \x01(\tB\x16\xbaH\x13r\x112\x0f^[A-Za-z0-9_]+$H\x00R\n" +
+	"\x04type\x18\x01 \x01(\tB\x18\xbaH\x15r\x13\x10\x012\x0f^[A-Za-z0-9_]+$R\x04type\x12|\n" +
+	"\vinstance_id\x18\x02 \x01(\tBV\xbaHSrQ2O(?i)^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$|^[A-Za-z][A-Za-z0-9._-]{0,255}$H\x00R\n" +
 	"instanceId\x88\x01\x01B\x0e\n" +
 	"\f_instance_idBr\n" +
 	"(org.project_kessel.api.inventory.v1beta2P\x01ZDgithub.com/project-kessel/inventory-api/api/kessel/inventory/v1beta2b\x06proto3"
