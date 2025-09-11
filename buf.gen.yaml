@@ -1,8 +1,6 @@
 version: v2
 inputs:
   - module: buf.build/project-kessel/inventory-api
-  - module: buf.build/bufbuild/protovalidate
-  - module: buf.build/googleapis/googleapis
 plugins:
   - remote: buf.build/protocolbuffers/go:v1.36.6
     out: .
@@ -12,4 +10,3 @@ plugins:
     out: .
     opt:
       - paths=source_relative
-
