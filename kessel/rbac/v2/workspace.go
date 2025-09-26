@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/project-kessel/kessel-sdk-go/kessel/auth"
 	"io"
 	"net/http"
 	"strings"
@@ -21,7 +22,7 @@ type Workspace struct {
 type FetchWorkspaceOptions struct {
 	// Optionally specify an http.Client or use http.DefaultClient
 	HttpClient *http.Client
-	Auth       AuthRequest
+	Auth       auth.AuthRequest
 }
 
 type workspaceAPIResponse struct {

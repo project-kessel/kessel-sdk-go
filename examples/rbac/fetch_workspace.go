@@ -26,7 +26,7 @@ func fetchWorkspace() {
 
 	defaultWorkspace, err := v2.FetchDefaultWorkspace(ctx, "http://localhost:8888", "12345", v2.FetchWorkspaceOptions{
 		HttpClient: http.DefaultClient,
-		Auth: v2.OAuth2AuthRequest(&oauthCredentials, v2.OAuth2AuthRequestOptions{
+		Auth: auth.OAuth2AuthRequest(&oauthCredentials, auth.OAuth2AuthRequestOptions{
 			HttpClient: http.DefaultClient,
 		}),
 	})
@@ -39,7 +39,7 @@ func fetchWorkspace() {
 
 	rootWorkspace, err := v2.FetchRootWorkspace(ctx, "http://localhost:8888", "12345", v2.FetchWorkspaceOptions{
 		HttpClient: http.DefaultClient,
-		Auth: v2.OAuth2AuthRequest(&oauthCredentials, v2.OAuth2AuthRequestOptions{
+		Auth: auth.OAuth2AuthRequest(&oauthCredentials, auth.OAuth2AuthRequestOptions{
 			HttpClient: http.DefaultClient,
 		}),
 	})

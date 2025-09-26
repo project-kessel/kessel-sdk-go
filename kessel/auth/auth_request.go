@@ -1,8 +1,7 @@
-package v2
+package auth
 
 import (
 	"context"
-	"github.com/project-kessel/kessel-sdk-go/kessel/auth"
 	"net/http"
 )
 
@@ -15,16 +14,16 @@ type OAuth2AuthRequestOptions struct {
 }
 
 type oauth2Auth struct {
-	credentials *auth.OAuth2ClientCredentials
+	credentials *OAuth2ClientCredentials
 	httpClient  *http.Client
 }
 
-func OAuth2AuthRequest(credentials *auth.OAuth2ClientCredentials, options OAuth2AuthRequestOptions) AuthRequest {
+func OAuth2AuthRequest(credentials *OAuth2ClientCredentials, options OAuth2AuthRequestOptions) AuthRequest {
 	return oauth2Auth{credentials: credentials, httpClient: options.HttpClient}
 }
 
 func (o oauth2Auth) ConfigureRequest(ctx context.Context, request *http.Request) error {
-	token, err := o.credentials.GetToken(ctx, auth.GetTokenOptions{
+	token, err := o.credentials.GetToken(ctx, GetTokenOptions{
 		HttpClient: o.httpClient,
 	})
 
