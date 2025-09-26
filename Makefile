@@ -35,7 +35,7 @@ lint: ## Run golangci-lint
 .PHONY: test
 test: ## Run all tests
 	@echo "Running tests"
-	@go test -v ./kessel/config/...  ./kessel/inventory/...
+	@go test -v ./kessel/...
 
 .PHONY: test-coverage
 test-coverage: ## Run tests with coverage
