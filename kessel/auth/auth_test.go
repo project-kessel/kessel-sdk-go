@@ -46,7 +46,7 @@ func TestFetchOIDCDiscovery(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			_, err := FetchOIDCDiscovery("invalid-url", FetchOIDCDiscoveryOptions{})
+			_, err := FetchOIDCDiscovery(context.TODO(), "invalid-url", FetchOIDCDiscoveryOptions{})
 			if tt.expectError {
 				if err == nil {
 					t.Errorf("Expected error but got none")
@@ -66,12 +66,11 @@ func TestFetchOIDCDiscovery(t *testing.T) {
 func TestFetchOIDCDiscovery_DefaultValues(t *testing.T) {
 	// Test with nil context and http client (should use defaults)
 	options := FetchOIDCDiscoveryOptions{
-		Context:    nil,
 		HttpClient: nil,
 	}
 
 	// This should fail gracefully, but we're testing that defaults are applied
-	_, err := FetchOIDCDiscovery("invalid-url-for-testing", options)
+	_, err := FetchOIDCDiscovery(context.TODO(), "invalid-url-for-testing", options)
 	if err == nil {
 		t.Errorf("Expected error with invalid URL")
 	}
@@ -95,7 +94,6 @@ func TestOAuth2ClientCredentials_GetToken(t *testing.T) {
 			},
 			options: GetTokenOptions{
 				ForceRefresh: false,
-				Context:      context.Background(),
 			},
 			expectError:   false,
 			expectRefresh: false,
@@ -108,7 +106,6 @@ func TestOAuth2ClientCredentials_GetToken(t *testing.T) {
 			},
 			options: GetTokenOptions{
 				ForceRefresh: true,
-				Context:      context.Background(),
 			},
 			serverHandler: func(w http.ResponseWriter, r *http.Request) {
 				response := map[string]interface{}{
@@ -127,7 +124,6 @@ func TestOAuth2ClientCredentials_GetToken(t *testing.T) {
 			setupToken: nil, // No cached token
 			options: GetTokenOptions{
 				ForceRefresh: false,
-				Context:      context.Background(),
 			},
 			serverHandler: func(w http.ResponseWriter, r *http.Request) {
 				response := map[string]interface{}{
@@ -146,7 +142,6 @@ func TestOAuth2ClientCredentials_GetToken(t *testing.T) {
 			setupToken: nil,
 			options: GetTokenOptions{
 				ForceRefresh: false,
-				Context:      context.Background(),
 			},
 			serverHandler: func(w http.ResponseWriter, r *http.Request) {
 				http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -180,7 +175,7 @@ func TestOAuth2ClientCredentials_GetToken(t *testing.T) {
 				tt.options.HttpClient = http.DefaultClient
 			}
 
-			result, err := credentials.GetToken(tt.options)
+			result, err := credentials.GetToken(context.TODO(), tt.options)
 
 			if tt.expectError {
 				if err == nil {
@@ -225,11 +220,10 @@ func TestOAuth2ClientCredentials_GetToken_DefaultValues(t *testing.T) {
 	// Test with nil context and http client (should use defaults)
 	options := GetTokenOptions{
 		ForceRefresh: false,
-		Context:      nil,
 		HttpClient:   nil,
 	}
 
-	result, err := credentials.GetToken(options)
+	result, err := credentials.GetToken(context.TODO(), options)
 	if err != nil {
 		t.Errorf("Unexpected error: %v", err)
 	}
@@ -412,9 +406,8 @@ func TestConcurrentTokenAccess(t *testing.T) {
 
 	for i := 0; i < numGoroutines; i++ {
 		go func() {
-			token, err := credentials.GetToken(GetTokenOptions{
+			token, err := credentials.GetToken(context.TODO(), GetTokenOptions{
 				ForceRefresh: false,
-				Context:      context.Background(),
 			})
 			if err != nil {
 				errors <- err

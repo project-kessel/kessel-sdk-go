@@ -63,11 +63,12 @@ func NewOAuth2ClientCredentials(clientId string, clientSecret string, tokenEndpo
 }
 
 func FetchOIDCDiscovery(ctx context.Context, issuerUrl string, options FetchOIDCDiscoveryOptions) (OIDCDiscoveryMetadata, error) {
-	if options.HttpClient == nil {
-		options.HttpClient = http.DefaultClient
+	httpClient := options.HttpClient
+	if httpClient == nil {
+		httpClient = http.DefaultClient
 	}
 
-	discoveryConfig, err := client.Discover(ctx, issuerUrl, options.HttpClient)
+	discoveryConfig, err := client.Discover(ctx, issuerUrl, httpClient)
 	if err != nil {
 		return OIDCDiscoveryMetadata{}, err
 	}
@@ -76,8 +77,9 @@ func FetchOIDCDiscovery(ctx context.Context, issuerUrl string, options FetchOIDC
 }
 
 func (o *OAuth2ClientCredentials) GetToken(ctx context.Context, options GetTokenOptions) (RefreshTokenResponse, error) {
-	if options.HttpClient == nil {
-		options.HttpClient = http.DefaultClient
+	httpClient := options.HttpClient
+	if httpClient == nil {
+		httpClient = http.DefaultClient
 	}
 
 	if !options.ForceRefresh && o.isTokenValid() {
@@ -92,7 +94,7 @@ func (o *OAuth2ClientCredentials) GetToken(ctx context.Context, options GetToken
 	}
 
 	var err error
-	o.cachedToken, err = o.refreshToken(ctx, options.HttpClient)
+	o.cachedToken, err = o.refreshToken(ctx, httpClient)
 
 	return o.cachedToken, err
 }

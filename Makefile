@@ -25,6 +25,7 @@ build: .env ## Build example binaries
 	@go build -o bin/oauth2client-authenticated-example ./examples/grpc/oauth2client_authenticated.go
 	@go build -o bin/report-resource-example ./examples/grpc/report_resource.go
 	@go build -o bin/delete-resource-example ./examples/grpc/delete_resource.go
+	@go build -o bin/fetch_workspace ./examples/rbac/fetch_workspace.go
 
 .PHONY: lint
 lint: ## Run golangci-lint
@@ -34,7 +35,7 @@ lint: ## Run golangci-lint
 .PHONY: test
 test: ## Run all tests
 	@echo "Running tests"
-	@go test -v ./kessel/config/...  ./kessel/inventory/...
+	@go test -v ./kessel/...
 
 .PHONY: test-coverage
 test-coverage: ## Run tests with coverage
