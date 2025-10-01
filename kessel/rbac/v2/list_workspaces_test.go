@@ -5,6 +5,8 @@ import (
 	"io"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 
 	v1beta2 "github.com/project-kessel/kessel-sdk-go/kessel/inventory/v1beta2"
@@ -73,24 +75,11 @@ func TestListWorkspaces(t *testing.T) {
 			expectedError:        false,
 			expectedRequestCount: 1,
 			validateRequests: func(t *testing.T, requests []*v1beta2.StreamedListObjectsRequest) {
-				if len(requests) != 1 {
-					t.Errorf("Expected 1 request, got %d", len(requests))
-					return
-				}
+				require.Len(t, requests, 1)
 				req := requests[0]
-				if req.Relation != "member" {
-					t.Errorf("Expected relation 'member', got '%s'", req.Relation)
-				}
-				if req.ObjectType == nil {
-					t.Error("Expected ObjectType to be set")
-					return
-				}
-				if req.ObjectType.ResourceType != "workspace" {
-					t.Errorf("Expected ResourceType 'workspace', got '%s'", req.ObjectType.ResourceType)
-				}
-				if req.ObjectType.ReporterType == nil || *req.ObjectType.ReporterType != "rbac" {
-					t.Error("Expected ReporterType 'rbac'")
-				}
+				assert.Equal(t, "member", req.Relation)
+				assert.Equal(t, "workspace", req.ObjectType.ResourceType)
+				assert.Equal(t, "rbac", *req.ObjectType.ReporterType)
 			},
 		},
 		{
@@ -103,28 +92,17 @@ func TestListWorkspaces(t *testing.T) {
 			expectedError:        false,
 			expectedRequestCount: 2,
 			validateRequests: func(t *testing.T, requests []*v1beta2.StreamedListObjectsRequest) {
-				if len(requests) != 2 {
-					t.Errorf("Expected 2 requests (initial + continuation), got %d", len(requests))
-					return
-				}
+				require.Len(t, requests, 2)
 
 				firstReq := requests[0]
-				if firstReq.Pagination != nil && firstReq.Pagination.ContinuationToken != nil && *firstReq.Pagination.ContinuationToken != "" {
-					t.Errorf("First request should have empty continuation token, got '%s'", *firstReq.Pagination.ContinuationToken)
+				if firstReq.Pagination != nil && firstReq.Pagination.ContinuationToken != nil {
+					assert.Empty(t, *firstReq.Pagination.ContinuationToken)
 				}
 
 				secondReq := requests[1]
-				if secondReq.Pagination == nil {
-					t.Error("Second request should have pagination")
-					return
-				}
-				if secondReq.Pagination.ContinuationToken == nil {
-					t.Error("Second request should have continuation token")
-					return
-				}
-				if *secondReq.Pagination.ContinuationToken != "next-page-token" {
-					t.Errorf("Expected continuation token 'next-page-token', got '%s'", *secondReq.Pagination.ContinuationToken)
-				}
+				require.NotNil(t, secondReq.Pagination)
+				require.NotNil(t, secondReq.Pagination.ContinuationToken)
+				assert.Equal(t, "next-page-token", *secondReq.Pagination.ContinuationToken)
 			},
 		},
 		{
@@ -137,9 +115,7 @@ func TestListWorkspaces(t *testing.T) {
 			expectedError:        false,
 			expectedRequestCount: 1,
 			validateRequests: func(t *testing.T, requests []*v1beta2.StreamedListObjectsRequest) {
-				if len(requests) != 1 {
-					t.Errorf("Expected only 1 request, got %d", len(requests))
-				}
+				assert.Len(t, requests, 1)
 			},
 		},
 		{
@@ -162,22 +138,11 @@ func TestListWorkspaces(t *testing.T) {
 			expectedError:        false,
 			expectedRequestCount: 1,
 			validateRequests: func(t *testing.T, requests []*v1beta2.StreamedListObjectsRequest) {
-				if len(requests) != 1 {
-					t.Errorf("Expected 1 request, got %d", len(requests))
-					return
-				}
+				require.Len(t, requests, 1)
 				req := requests[0]
-				if req.Pagination == nil {
-					t.Error("Request should have pagination")
-					return
-				}
-				if req.Pagination.ContinuationToken == nil {
-					t.Error("Request should have continuation token")
-					return
-				}
-				if *req.Pagination.ContinuationToken != "resume-from-here" {
-					t.Errorf("Expected continuation token 'resume-from-here', got '%s'", *req.Pagination.ContinuationToken)
-				}
+				require.NotNil(t, req.Pagination)
+				require.NotNil(t, req.Pagination.ContinuationToken)
+				assert.Equal(t, "resume-from-here", *req.Pagination.ContinuationToken)
 			},
 		},
 	}
@@ -200,21 +165,17 @@ func TestListWorkspaces(t *testing.T) {
 			}
 
 			if tt.expectedError {
-				if iterationErr == nil {
-					t.Error("Expected error but got none")
-				}
+				assert.Error(t, iterationErr)
 			} else {
-				if iterationErr != nil {
-					t.Errorf("Unexpected error: %v", iterationErr)
-				}
+				assert.NoError(t, iterationErr)
 			}
 
 			if tt.validateRequests != nil {
 				tt.validateRequests(t, mockClient.capturedRequests)
 			}
 
-			if tt.expectedRequestCount > 0 && len(mockClient.capturedRequests) != tt.expectedRequestCount {
-				t.Errorf("Expected %d requests, got %d", tt.expectedRequestCount, len(mockClient.capturedRequests))
+			if tt.expectedRequestCount > 0 {
+				assert.Len(t, mockClient.capturedRequests, tt.expectedRequestCount)
 			}
 		})
 	}
