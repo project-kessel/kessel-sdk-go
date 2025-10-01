@@ -26,6 +26,7 @@ build: .env ## Build example binaries
 	@go build -o bin/report-resource-example ./examples/grpc/report_resource.go
 	@go build -o bin/delete-resource-example ./examples/grpc/delete_resource.go
 	@go build -o bin/fetch_workspace ./examples/rbac/fetch_workspace.go
+	@go build -o bin/list_workspaces ./examples/rbac/list_workspaces.go
 
 .PHONY: lint
 lint: ## Run golangci-lint
@@ -40,7 +41,7 @@ test: ## Run all tests
 .PHONY: test-coverage
 test-coverage: ## Run tests with coverage
 	@echo "Running tests with coverage"
-	@go test -coverprofile=coverage.out ./kessel/config/...  ./kessel/inventory/...
+	@go test -coverprofile=coverage.out ./kessel/...
 	@go tool cover -html=coverage.out -o coverage.html
 	@echo "Coverage report generated: coverage.html"
 

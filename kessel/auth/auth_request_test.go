@@ -385,7 +385,7 @@ func TestOAuth2AuthRequestOptions_Defaults(t *testing.T) {
 
 	// Test with empty options
 	authRequest := OAuth2AuthRequest(&creds, OAuth2AuthRequestOptions{})
-	
+
 	if authImpl, ok := authRequest.(oauth2Auth); ok {
 		if authImpl.httpClient != nil {
 			t.Error("Expected httpClient to be nil when not provided in options")
@@ -396,7 +396,7 @@ func TestOAuth2AuthRequestOptions_Defaults(t *testing.T) {
 	authRequest2 := OAuth2AuthRequest(&creds, OAuth2AuthRequestOptions{
 		HttpClient: nil,
 	})
-	
+
 	if authImpl, ok := authRequest2.(oauth2Auth); ok {
 		if authImpl.httpClient != nil {
 			t.Error("Expected httpClient to be nil when explicitly set to nil in options")

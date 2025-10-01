@@ -4,10 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/project-kessel/kessel-sdk-go/kessel/auth"
 	"io"
 	"net/http"
 	"strings"
+
+	"github.com/project-kessel/kessel-sdk-go/kessel/auth"
 )
 
 const workspaceEndpoint = "/api/rbac/v2/workspaces/"
