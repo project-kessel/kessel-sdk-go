@@ -38,7 +38,7 @@ func listWorkspaces() {
 	}()
 
 	fmt.Println("Listing workspaces:")
-	for resp, err := range v2.ListWorkspaces(ctx, inventoryClient, v2.PrincipalSubject("john.doe", "redhat.com"), "member", "") {
+	for resp, err := range v2.ListWorkspaces(ctx, inventoryClient, v2.PrincipalSubject("alice", "redhat"), "view_document", "") {
 		if err != nil {
 			log.Fatalf("Error listing workspaces: %v", err)
 		}

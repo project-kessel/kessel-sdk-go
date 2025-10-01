@@ -37,15 +37,15 @@ func TestPrincipalResource(t *testing.T) {
 		{
 			name:            "basic principal",
 			id:              "user123",
-			domain:          "redhat.com",
-			expectedResId:   "redhat.com/user123",
+			domain:          "redhat",
+			expectedResId:   "redhat/user123",
 			expectedResType: "principal",
 		},
 		{
 			name:            "principal with numeric id",
 			id:              "12345",
-			domain:          "example.org",
-			expectedResId:   "example.org/12345",
+			domain:          "example",
+			expectedResId:   "example/12345",
 			expectedResType: "principal",
 		},
 	}
@@ -84,12 +84,12 @@ func TestWorkspaceResource(t *testing.T) {
 }
 
 func TestPrincipalSubject(t *testing.T) {
-	subj := PrincipalSubject("user123", "redhat.com")
+	subj := PrincipalSubject("user123", "redhat")
 
 	assert.NotNil(t, subj)
 	assert.NotNil(t, subj.Resource)
 	assert.Equal(t, "principal", subj.Resource.ResourceType)
-	assert.Equal(t, "redhat.com/user123", subj.Resource.ResourceId)
+	assert.Equal(t, "redhat/user123", subj.Resource.ResourceId)
 	assert.Nil(t, subj.Relation)
 }
 
@@ -110,7 +110,7 @@ func TestSubject(t *testing.T) {
 		},
 		{
 			name:           "subject without relation",
-			resourceRef:    PrincipalResource("user123", "redhat.com"),
+			resourceRef:    PrincipalResource("user123", "redhat"),
 			relation:       "",
 			expectRelation: false,
 		},
