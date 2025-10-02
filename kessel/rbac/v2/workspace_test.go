@@ -13,13 +13,13 @@ import (
 
 func TestFetchDefaultWorkspace(t *testing.T) {
 	tests := []struct {
-		name           string
-		serverHandler  func(w http.ResponseWriter, r *http.Request)
-		expectedError  bool
-		expectedWS     *Workspace
-		rbacEndpoint   string
-		orgId          string
-		validateReq    func(t *testing.T, r *http.Request)
+		name          string
+		serverHandler func(w http.ResponseWriter, r *http.Request)
+		expectedError bool
+		expectedWS    *Workspace
+		rbacEndpoint  string
+		orgId         string
+		validateReq   func(t *testing.T, r *http.Request)
 	}{
 		{
 			name: "successful default workspace fetch",
@@ -106,10 +106,10 @@ func TestFetchDefaultWorkspace(t *testing.T) {
 				w.Header().Set("Content-Type", "application/json")
 				json.NewEncoder(w).Encode(response)
 			},
-			expectedError:  false,
-			rbacEndpoint:   "http://example.com/",
-			orgId:          "org123",
-			expectedWS:     &Workspace{Id: "ws1", Name: "WS1", Type: "default"},
+			expectedError: false,
+			rbacEndpoint:  "http://example.com/",
+			orgId:         "org123",
+			expectedWS:    &Workspace{Id: "ws1", Name: "WS1", Type: "default"},
 		},
 	}
 

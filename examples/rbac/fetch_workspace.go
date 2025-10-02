@@ -2,14 +2,15 @@ package main
 
 import (
 	"context"
-	_ "github.com/joho/godotenv/autoload"
-	"github.com/project-kessel/kessel-sdk-go/kessel/auth"
 	"log"
 	"net/http"
 	"os"
-)
 
-import "github.com/project-kessel/kessel-sdk-go/kessel/rbac/v2"
+	_ "github.com/joho/godotenv/autoload"
+	"github.com/project-kessel/kessel-sdk-go/kessel/auth"
+
+	v2 "github.com/project-kessel/kessel-sdk-go/kessel/rbac/v2"
+)
 
 func fetchWorkspace() {
 	ctx := context.Background()
@@ -24,7 +25,8 @@ func fetchWorkspace() {
 
 	oauthCredentials := auth.NewOAuth2ClientCredentials(os.Getenv("AUTH_CLIENT_ID"), os.Getenv("AUTH_CLIENT_SECRET"), discovered.TokenEndpoint)
 
-	defaultWorkspace, err := v2.FetchDefaultWorkspace(ctx, "http://localhost:8888", "12345", v2.FetchWorkspaceOptions{
+	// GET /api/rbac/v2/workspaces/?type=default
+	defaultWorkspace, err := v2.FetchDefaultWorkspace(ctx, "http://localhost:8000", "12345", v2.FetchWorkspaceOptions{
 		HttpClient: http.DefaultClient,
 		Auth: auth.OAuth2AuthRequest(&oauthCredentials, auth.OAuth2AuthRequestOptions{
 			HttpClient: http.DefaultClient,
@@ -37,7 +39,8 @@ func fetchWorkspace() {
 
 	log.Printf("Found default Workspace: %+v", defaultWorkspace)
 
-	rootWorkspace, err := v2.FetchRootWorkspace(ctx, "http://localhost:8888", "12345", v2.FetchWorkspaceOptions{
+	// GET /api/rbac/v2/workspaces/?type=root
+	rootWorkspace, err := v2.FetchRootWorkspace(ctx, "http://localhost:8000", "12345", v2.FetchWorkspaceOptions{
 		HttpClient: http.DefaultClient,
 		Auth: auth.OAuth2AuthRequest(&oauthCredentials, auth.OAuth2AuthRequestOptions{
 			HttpClient: http.DefaultClient,
