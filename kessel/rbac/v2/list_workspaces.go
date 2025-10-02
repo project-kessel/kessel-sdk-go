@@ -50,6 +50,7 @@ func ListWorkspaces(
 					return
 				}
 
+				// stop fetching if loop broke early
 				if !yield(response, nil) {
 					return
 				}

@@ -11,18 +11,14 @@ import (
 func TestWorkspaceType(t *testing.T) {
 	rt := WorkspaceType()
 
-	assert.NotNil(t, rt)
 	assert.Equal(t, "workspace", rt.ResourceType)
-	assert.NotNil(t, rt.ReporterType)
 	assert.Equal(t, "rbac", *rt.ReporterType)
 }
 
 func TestRoleType(t *testing.T) {
 	rt := RoleType()
 
-	assert.NotNil(t, rt)
 	assert.Equal(t, "role", rt.ResourceType)
-	assert.NotNil(t, rt.ReporterType)
 	assert.Equal(t, "rbac", *rt.ReporterType)
 }
 
@@ -54,10 +50,8 @@ func TestPrincipalResource(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ref := PrincipalResource(tt.id, tt.domain)
 
-			assert.NotNil(t, ref)
 			assert.Equal(t, tt.expectedResType, ref.ResourceType)
 			assert.Equal(t, tt.expectedResId, ref.ResourceId)
-			assert.NotNil(t, ref.Reporter)
 			assert.Equal(t, "rbac", ref.Reporter.Type)
 		})
 	}
@@ -66,28 +60,22 @@ func TestPrincipalResource(t *testing.T) {
 func TestRoleResource(t *testing.T) {
 	ref := RoleResource("admin")
 
-	assert.NotNil(t, ref)
 	assert.Equal(t, "role", ref.ResourceType)
 	assert.Equal(t, "admin", ref.ResourceId)
-	assert.NotNil(t, ref.Reporter)
 	assert.Equal(t, "rbac", ref.Reporter.Type)
 }
 
 func TestWorkspaceResource(t *testing.T) {
 	ref := WorkspaceResource("ws-123")
 
-	assert.NotNil(t, ref)
 	assert.Equal(t, "workspace", ref.ResourceType)
 	assert.Equal(t, "ws-123", ref.ResourceId)
-	assert.NotNil(t, ref.Reporter)
 	assert.Equal(t, "rbac", ref.Reporter.Type)
 }
 
 func TestPrincipalSubject(t *testing.T) {
 	subj := PrincipalSubject("user123", "redhat")
 
-	assert.NotNil(t, subj)
-	assert.NotNil(t, subj.Resource)
 	assert.Equal(t, "principal", subj.Resource.ResourceType)
 	assert.Equal(t, "redhat/user123", subj.Resource.ResourceId)
 	assert.Nil(t, subj.Relation)
