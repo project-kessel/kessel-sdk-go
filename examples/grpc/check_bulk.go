@@ -60,16 +60,17 @@ func checkBulk() {
 	checkBulkResponse, err := inventoryClient.CheckBulk(ctx, checkBulkRequest)
 	if err != nil {
 		if st, ok := status.FromError(err); ok {
-			fmt.Println("gRPC error occurred during CheckBulk:")
-			fmt.Printf("Code: %v\n", st.Code())
-			fmt.Printf("Details: %s\n", st.Message())
-			if st.Code() == codes.Unavailable {
-				log.Fatal("Service unavailable")
+			switch st.Code() {
+			case codes.Unavailable:
+				log.Fatal("Service unavailable: ", err)
+			case codes.PermissionDenied:
+				log.Fatal("Permission denied: ", err)
+			default:
+				log.Fatal("gRPC connection error: ", err)
 			}
 		} else {
 			log.Fatal("Unknown error: ", err)
 		}
-		return
 	}
 
 	fmt.Println("CheckBulk response received successfully")
@@ -85,7 +86,7 @@ func checkBulk() {
 		)
 
 		if item := pair.GetItem(); item != nil {
-			fmt.Printf("Result: %v\n", item)
+			fmt.Printf("%v\n", item)
 		} else if err := pair.GetError(); err != nil {
 			fmt.Printf("Error: Code=%d, Message=%s\n", err.Code, err.Message)
 		}
