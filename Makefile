@@ -27,6 +27,7 @@ build: .env ## Build example binaries
 	@go build -o bin/delete-resource-example ./examples/grpc/delete_resource.go
 	@go build -o bin/fetch_workspace ./examples/rbac/fetch_workspace.go
 	@go build -o bin/list_workspaces ./examples/rbac/list_workspaces.go
+	@go build -o bin/check_bulk_example ./examples/grpc/check_bulk.go
 
 .PHONY: lint
 lint: ## Run golangci-lint
