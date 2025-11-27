@@ -32,7 +32,14 @@ build: .env ## Build example binaries
 .PHONY: lint
 lint: ## Run golangci-lint
 	@echo "Running golangci-lint"
-	@$(DOCKER) run -t --rm -v $(PWD):/app -w /app golangci/golangci-lint:v2.1 golangci-lint run -v ./examples/... ./kessel/config/... ./kessel/inventory/...
+	@$(DOCKER) run -t --rm -v $(PWD):/app -w /app golangci/golangci-lint:v2.1 sh -c '\
+		echo "Linting SDK code..."; \
+		golangci-lint run -v ./kessel/...; \
+		echo "Linting example files individually..."; \
+		for file in examples/grpc/*.go examples/rbac/*.go; do \
+			echo "Linting $$file"; \
+			golangci-lint run -v $$file; \
+		done'
 
 .PHONY: test
 test: ## Run all tests
