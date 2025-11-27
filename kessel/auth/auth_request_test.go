@@ -89,7 +89,9 @@ func TestOAuth2Auth_ConfigureRequest(t *testing.T) {
 						"expires_in":   3600,
 					}
 					w.Header().Set("Content-Type", "application/json")
-					json.NewEncoder(w).Encode(response)
+					if err := json.NewEncoder(w).Encode(response); err != nil {
+						t.Errorf("Failed to encode test response: %v", err)
+					}
 				}))
 			},
 			setupCreds: func(tokenEndpoint string) *OAuth2ClientCredentials {
@@ -121,7 +123,9 @@ func TestOAuth2Auth_ConfigureRequest(t *testing.T) {
 						"expires_in":   3600,
 					}
 					w.Header().Set("Content-Type", "application/json")
-					json.NewEncoder(w).Encode(response)
+					if err := json.NewEncoder(w).Encode(response); err != nil {
+						t.Errorf("Failed to encode test response: %v", err)
+					}
 				}))
 			},
 			setupCreds: func(tokenEndpoint string) *OAuth2ClientCredentials {
@@ -174,7 +178,9 @@ func TestOAuth2Auth_ConfigureRequest(t *testing.T) {
 						"expires_in":   3600,
 					}
 					w.Header().Set("Content-Type", "application/json")
-					json.NewEncoder(w).Encode(response)
+					if err := json.NewEncoder(w).Encode(response); err != nil {
+						t.Errorf("Failed to encode test response: %v", err)
+					}
 				}))
 			},
 			setupCreds: func(tokenEndpoint string) *OAuth2ClientCredentials {
@@ -246,7 +252,7 @@ func TestOAuth2Auth_ConfigureRequest_MultipleRequests(t *testing.T) {
 			"expires_in":   3600,
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
+		_ = json.NewEncoder(w).Encode(response)
 	}))
 	defer server.Close()
 
@@ -285,7 +291,7 @@ func TestOAuth2Auth_ConfigureRequest_ContextCancellation(t *testing.T) {
 			"expires_in":   3600,
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
+		_ = json.NewEncoder(w).Encode(response)
 	}))
 	defer server.Close()
 
@@ -329,7 +335,7 @@ func TestOAuth2Auth_ConfigureRequest_ExpiredTokenRefresh(t *testing.T) {
 			"expires_in":   expiresIn,
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
+		_ = json.NewEncoder(w).Encode(response)
 	}))
 	defer server.Close()
 
@@ -372,7 +378,7 @@ func TestOAuth2Auth_InterfaceCompliance(t *testing.T) {
 	authRequest := OAuth2AuthRequest(&creds, OAuth2AuthRequestOptions{})
 
 	// Verify that OAuth2AuthRequest returns an object that implements AuthRequest interface
-	var _ AuthRequest = authRequest
+	var _ = authRequest
 
 	// Verify that we can call ConfigureRequest method
 	req, _ := http.NewRequest("GET", "https://example.com", nil)

@@ -61,7 +61,7 @@ func fetchWorkspace(ctx context.Context, rbacBaseEndpoint string, orgId string, 
 		return nil, err
 	}
 
-	defer response.Body.Close()
+	defer func() { _ = response.Body.Close() }()
 
 	if response.StatusCode != 200 {
 		return nil, fmt.Errorf("error fetching %s workspace - http status %s", workspaceType, response.Status)
