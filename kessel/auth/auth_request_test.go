@@ -252,7 +252,9 @@ func TestOAuth2Auth_ConfigureRequest_MultipleRequests(t *testing.T) {
 			"expires_in":   3600,
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(response)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			t.Errorf("Failed to encode test response: %v", err)
+		}
 	}))
 	defer server.Close()
 
@@ -291,7 +293,9 @@ func TestOAuth2Auth_ConfigureRequest_ContextCancellation(t *testing.T) {
 			"expires_in":   3600,
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(response)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			t.Errorf("Failed to encode test response: %v", err)
+		}
 	}))
 	defer server.Close()
 
@@ -335,7 +339,9 @@ func TestOAuth2Auth_ConfigureRequest_ExpiredTokenRefresh(t *testing.T) {
 			"expires_in":   expiresIn,
 		}
 		w.Header().Set("Content-Type", "application/json")
-		_ = json.NewEncoder(w).Encode(response)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			t.Errorf("Failed to encode test response: %v", err)
+		}
 	}))
 	defer server.Close()
 
