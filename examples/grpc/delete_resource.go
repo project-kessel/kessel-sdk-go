@@ -13,8 +13,6 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func addr[T any](t T) *T { return &t }
-
 func deleteResource() {
 	ctx := context.Background()
 

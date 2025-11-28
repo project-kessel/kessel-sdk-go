@@ -35,7 +35,9 @@ func TestFetchDefaultWorkspace(t *testing.T) {
 					},
 				}
 				w.Header().Set("Content-Type", "application/json")
-				json.NewEncoder(w).Encode(response)
+				if err := json.NewEncoder(w).Encode(response); err != nil {
+					t.Errorf("Failed to encode test response: %v", err)
+				}
 			},
 			expectedError: false,
 			expectedWS: &Workspace{
@@ -75,7 +77,9 @@ func TestFetchDefaultWorkspace(t *testing.T) {
 			serverHandler: func(w http.ResponseWriter, r *http.Request) {
 				response := workspaceAPIResponse{Data: []Workspace{}}
 				w.Header().Set("Content-Type", "application/json")
-				json.NewEncoder(w).Encode(response)
+				if err := json.NewEncoder(w).Encode(response); err != nil {
+					t.Errorf("Failed to encode test response: %v", err)
+				}
 			},
 			expectedError: true,
 			rbacEndpoint:  "",
@@ -91,7 +95,9 @@ func TestFetchDefaultWorkspace(t *testing.T) {
 					},
 				}
 				w.Header().Set("Content-Type", "application/json")
-				json.NewEncoder(w).Encode(response)
+				if err := json.NewEncoder(w).Encode(response); err != nil {
+					t.Errorf("Failed to encode test response: %v", err)
+				}
 			},
 			expectedError: true,
 			rbacEndpoint:  "",
@@ -104,7 +110,9 @@ func TestFetchDefaultWorkspace(t *testing.T) {
 					Data: []Workspace{{Id: "ws1", Name: "WS1", Type: "default"}},
 				}
 				w.Header().Set("Content-Type", "application/json")
-				json.NewEncoder(w).Encode(response)
+				if err := json.NewEncoder(w).Encode(response); err != nil {
+					t.Errorf("Failed to encode test response: %v", err)
+				}
 			},
 			expectedError: false,
 			rbacEndpoint:  "http://example.com/",
@@ -182,7 +190,9 @@ func TestFetchRootWorkspace(t *testing.T) {
 					},
 				}
 				w.Header().Set("Content-Type", "application/json")
-				json.NewEncoder(w).Encode(response)
+				if err := json.NewEncoder(w).Encode(response); err != nil {
+					t.Errorf("Failed to encode test response: %v", err)
+				}
 			},
 			expectedError: false,
 			expectedWS: &Workspace{
@@ -261,7 +271,9 @@ func TestFetchWorkspace_WithAuth(t *testing.T) {
 					Data: []Workspace{{Id: "ws1", Name: "WS1", Type: "default"}},
 				}
 				w.Header().Set("Content-Type", "application/json")
-				json.NewEncoder(w).Encode(response)
+				if err := json.NewEncoder(w).Encode(response); err != nil {
+					t.Errorf("Failed to encode test response: %v", err)
+				}
 			},
 			expectedError: false,
 			validateAuth: func(t *testing.T, r *http.Request) {
@@ -317,7 +329,9 @@ func TestFetchWorkspace_DefaultHttpClient(t *testing.T) {
 			Data: []Workspace{{Id: "ws1", Name: "WS1", Type: "default"}},
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			t.Errorf("Failed to encode test response: %v", err)
+		}
 	}))
 	defer server.Close()
 
@@ -334,7 +348,9 @@ func TestFetchWorkspace_DefaultHttpClient(t *testing.T) {
 func TestFetchWorkspace_InvalidJSON(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		w.Write([]byte("invalid json response"))
+		if _, err := w.Write([]byte("invalid json response")); err != nil {
+			t.Errorf("Failed to write response: %v", err)
+		}
 	}))
 	defer server.Close()
 
@@ -383,7 +399,9 @@ func TestFetchWorkspace_URLConstruction(t *testing.T) {
 					Data: []Workspace{{Id: "ws1", Name: "WS1", Type: "default"}},
 				}
 				w.Header().Set("Content-Type", "application/json")
-				json.NewEncoder(w).Encode(response)
+				if err := json.NewEncoder(w).Encode(response); err != nil {
+					t.Errorf("Failed to encode test response: %v", err)
+				}
 			}))
 			defer server.Close()
 

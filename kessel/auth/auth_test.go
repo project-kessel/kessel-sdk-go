@@ -114,7 +114,9 @@ func TestOAuth2ClientCredentials_GetToken(t *testing.T) {
 					"expires_in":   3600,
 				}
 				w.Header().Set("Content-Type", "application/json")
-				json.NewEncoder(w).Encode(response)
+				if err := json.NewEncoder(w).Encode(response); err != nil {
+					t.Errorf("Failed to encode test response: %v", err)
+				}
 			},
 			expectError:   false,
 			expectRefresh: true,
@@ -132,7 +134,9 @@ func TestOAuth2ClientCredentials_GetToken(t *testing.T) {
 					"expires_in":   3600,
 				}
 				w.Header().Set("Content-Type", "application/json")
-				json.NewEncoder(w).Encode(response)
+				if err := json.NewEncoder(w).Encode(response); err != nil {
+					t.Errorf("Failed to encode test response: %v", err)
+				}
 			},
 			expectError:   false,
 			expectRefresh: true,
@@ -211,7 +215,9 @@ func TestOAuth2ClientCredentials_GetToken_DefaultValues(t *testing.T) {
 			"expires_in":   3600,
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			t.Errorf("Failed to encode test response: %v", err)
+		}
 	}))
 	defer server.Close()
 
@@ -302,7 +308,9 @@ func TestOAuth2ClientCredentials_refreshToken(t *testing.T) {
 					"expires_in":   7200,
 				}
 				w.Header().Set("Content-Type", "application/json")
-				json.NewEncoder(w).Encode(response)
+				if err := json.NewEncoder(w).Encode(response); err != nil {
+					t.Errorf("Failed to encode test response: %v", err)
+				}
 			},
 			expectError:   false,
 			expectedToken: "new-access-token",
@@ -317,7 +325,9 @@ func TestOAuth2ClientCredentials_refreshToken(t *testing.T) {
 					// No expires_in field - should use default
 				}
 				w.Header().Set("Content-Type", "application/json")
-				json.NewEncoder(w).Encode(response)
+				if err := json.NewEncoder(w).Encode(response); err != nil {
+					t.Errorf("Failed to encode test response: %v", err)
+				}
 			},
 			expectError:   false,
 			expectedToken: "default-token",
@@ -393,7 +403,9 @@ func TestConcurrentTokenAccess(t *testing.T) {
 			"expires_in":   3600,
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(response)
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			t.Errorf("Failed to encode test response: %v", err)
+		}
 	}))
 	defer server.Close()
 
