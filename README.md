@@ -155,7 +155,7 @@ make build
 
 ### Prerequisites
 
-- Go 1.23 or later
+- Go 1.24 or later
 - Docker or Podman (for linting)
 - Protocol Buffers compiler (for code generation)
 
@@ -203,7 +203,7 @@ This project follows [Semantic Versioning 2.0.0](https://semver.org/). Version n
 - Write access to the GitHub repository
 - Ensure quality checks are passing
 - Review and update CHANGELOG or release notes as needed
-- Go 1.23 or higher
+- Go 1.24 or higher
 - [buf](https://github.com/bufbuild/buf) for protobuf/gRPC code generation:
   ```bash
   # On macOS
