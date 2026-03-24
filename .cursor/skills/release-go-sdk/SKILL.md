@@ -59,7 +59,13 @@ make build
 
 ### Step 4: Commit and Push
 
-If Step 2 produced changes (regenerated code, updated `go.sum`, etc.), commit and push them:
+Before committing, analyze the changes and present a summary to the user:
+
+1. Run `git diff --stat` and `git status` to inspect what changed.
+2. Summarize the changes for the user: how many files changed, the nature of the changes (e.g. regenerated protobuf code, updated dependencies, new API surface).
+3. **Ask the user for confirmation before committing.** Do not proceed until confirmed.
+
+Once confirmed, commit and push:
 
 ```bash
 git add .
