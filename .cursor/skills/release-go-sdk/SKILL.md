@@ -63,30 +63,43 @@ make test
 make build
 ```
 
-### Step 4: Commit and Push
+### Step 4: Review Changes
 
-Before committing, analyze the changes and present a summary to the user:
+Before committing, summarize the release for the user and ask for confirmation.
 
-1. Run `git diff --stat` and `git status` to inspect what changed.
-2. Summarize the changes for the user: how many files changed, the nature of the changes (e.g. regenerated protobuf code, updated dependencies, new API surface).
-3. **Ask the user for confirmation before committing.** Do not proceed until confirmed.
+1. Run `git diff --stat` and `git status` to gather all pending changes.
+2. Compare `$VERSION` against the latest git tag (`git describe --tags --abbrev=0`) to determine the bump type (major/minor/patch).
+3. Present a summary to the user including:
+   - The version being released and the bump type
+   - List of files that will be committed
+   - Quality check results
+4. **Wait for user confirmation before proceeding.**
 
-Once confirmed, commit and push:
+### Step 5: Commit, Push Branch, and Create PR
 
 ```bash
+git checkout -b release/${VERSION}
 git add .
 git commit -m "chore: regenerate protobuf code"
-git push origin main
+git push -u origin release/${VERSION}
+gh pr create --title "Release v${VERSION}" --body "Release version ${VERSION}"
 ```
 
-### Step 5: Tag the Release
+Include any other changed files (generated code, lock files) in the commit.
+
+**The remaining steps (tag, GitHub release) should be performed after the PR is merged to main.**
+
+### Step 6: Tag the Release
+
+After the PR is merged, switch back to main and pull:
 
 ```bash
+git checkout main && git pull origin main
 git tag -a v${VERSION} -m "Release version ${VERSION}"
 git push origin v${VERSION}
 ```
 
-### Step 6: Create GitHub Release
+### Step 7: Create GitHub Release
 
 ```bash
 gh release create v${VERSION} --title "v${VERSION}" --generate-notes
@@ -115,7 +128,9 @@ Release v${VERSION}:
 - [ ] Set VERSION env var
 - [ ] Regenerate gRPC code if needed (make generate)
 - [ ] Run make lint, make test, make build
-- [ ] Commit and push any changes
+- [ ] Review changes and get user confirmation
+- [ ] Commit, push release/${VERSION} branch, create PR
+- [ ] Merge PR to main
 - [ ] Create and push git tag (v${VERSION})
 - [ ] Create GitHub release
 ```
