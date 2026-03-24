@@ -215,14 +215,23 @@ This project follows [Semantic Versioning 2.0.0](https://semver.org/). Version n
 
 ### Release Process
 
-1. **Update Dependencies (if needed)**
+1. **Determine the version**
+
+Check existing tags (e.g. on GitHub or locally after `git fetch --tags`), choose the next version using semantic versioning (see [Version Management](#version-management) above), then set `VERSION` for the steps below:
+
+```bash
+export VERSION=X.Y.Z
+echo "Releasing version: v${VERSION}"
+```
+
+2. **Update Dependencies (if needed)**
 
 ```bash
 # Regenerate gRPC code if there are updates to the Kessel Inventory API
 make generate
 ```
 
-2. **Run Quality Checks**
+3. **Run Quality Checks**
 
 ```bash
 # Run linting
@@ -235,21 +244,42 @@ make test
 make build
 ```
 
-3. **Tag the Release**
+4. **Commit and push (if needed)**
+
+If `make generate` or other changes produced diffs, commit and push them before tagging:
 
 ```bash
-# Create and push a git tag
-git tag -a vX.Y.Z -m "Release version X.Y.Z"
-git push origin vX.Y.Z
+git add .
+git commit -m "chore: regenerate protobuf code"
+git push origin main
 ```
 
-4. **Create GitHub Release**
+5. **Tag the Release**
+
+```bash
+git tag -a v${VERSION} -m "Release version ${VERSION}"
+git push origin v${VERSION}
+```
+
+6. **Create GitHub Release**
+
+```bash
+gh release create v${VERSION} --title "v${VERSION}" --generate-notes
+```
+
+Or manually:
 
 - Go to the [GitHub Releases page](https://github.com/project-kessel/kessel-sdk-go/releases)
 - Click "Create a new release"
 - Select the tag you just created
 - Add release notes describing the changes
 - Publish the release
+
+After the tag is published, users can install that version with:
+
+```bash
+go get github.com/project-kessel/kessel-sdk-go@v${VERSION}
+```
 
 ## License
 
