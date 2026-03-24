@@ -14,6 +14,12 @@ description: Release a new version of the Kessel Go SDK (kessel-sdk-go). Guides 
 
 ## Release Process
 
+### Step 0: Preflight -- Clean Working Tree
+
+Run `git status --porcelain` to check for uncommitted changes. If the working tree is dirty, present the list of changed files and ask the user whether to:
+1. Abort the release (recommended if unsure)
+2. Stash changes for later: `git stash --include-untracked`
+
 ### Step 1: Determine the Version
 
 Check existing tags to find the current version:
@@ -104,6 +110,7 @@ go get github.com/project-kessel/kessel-sdk-go@v${VERSION}
 
 ```
 Release v${VERSION}:
+- [ ] Preflight: clean working tree
 - [ ] Check existing tags and determine new version
 - [ ] Set VERSION env var
 - [ ] Regenerate gRPC code if needed (make generate)
