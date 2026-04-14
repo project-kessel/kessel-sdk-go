@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	v1beta2 "github.com/project-kessel/kessel-sdk-go/kessel/inventory/v1beta2"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -107,12 +108,13 @@ func TestPrincipalFromRHIdentity(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			var subj *v1beta2.SubjectReference
 			var err error
 
 			if tt.domain != "" {
-				_, err = PrincipalFromRHIdentity(tt.identity, tt.domain)
+				subj, err = PrincipalFromRHIdentity(tt.identity, tt.domain)
 			} else {
-				_, err = PrincipalFromRHIdentity(tt.identity)
+				subj, err = PrincipalFromRHIdentity(tt.identity)
 			}
 
 			if tt.expectedErrMsg != "" {
@@ -122,6 +124,7 @@ func TestPrincipalFromRHIdentity(t *testing.T) {
 			}
 
 			require.NoError(t, err)
+			assert.Equal(t, tt.expectedResID, subj.Resource.ResourceId)
 		})
 	}
 }
@@ -196,12 +199,13 @@ func TestPrincipalFromRHIdentityHeader(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			var subj *v1beta2.SubjectReference
 			var err error
 
 			if tt.domain != "" {
-				_, err = PrincipalFromRHIdentityHeader(tt.header, tt.domain)
+				subj, err = PrincipalFromRHIdentityHeader(tt.header, tt.domain)
 			} else {
-				_, err = PrincipalFromRHIdentityHeader(tt.header)
+				subj, err = PrincipalFromRHIdentityHeader(tt.header)
 			}
 
 			if tt.expectedErrMsg != "" {
@@ -211,6 +215,7 @@ func TestPrincipalFromRHIdentityHeader(t *testing.T) {
 			}
 
 			require.NoError(t, err)
+			assert.Equal(t, tt.expectedResID, subj.Resource.ResourceId)
 		})
 	}
 }
