@@ -46,7 +46,7 @@ func extractUserID(identity map[string]any) (string, error) {
 
 func PrincipalFromRHIdentity(identity map[string]any, domain ...string) (*v1beta2.SubjectReference, error) {
 	d := defaultDomain
-	if len(domain) > 0 && domain[0] != "" {
+	if len(domain) > 0 {
 		d = domain[0]
 	}
 
