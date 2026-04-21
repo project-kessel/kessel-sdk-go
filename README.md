@@ -1,12 +1,14 @@
 # Kessel SDK for Go
 
-The official Go SDK for the Kessel inventory and authorization service. This SDK provides gRPC client implementation for secure communication.
+The official Go SDK for the [Kessel](https://github.com/project-kessel) inventory and authorization services. This SDK provides a type-safe gRPC client for managing resources, checking permissions, and interacting with RBAC workspaces.
 
 ## Features
 
-- **gRPC client support** - High-performance gRPC communication
-- **Type-safe API** - Generated from protobuf definitions
-- **Production ready** - Built with security, performance, and reliability in mind
+- **gRPC client support** -- High-performance gRPC communication via the unified `KesselInventoryService`
+- **Type-safe API** -- Generated from protobuf definitions at [buf.build/project-kessel/inventory-api](https://buf.build/project-kessel/inventory-api)
+- **Fluent ClientBuilder** -- Construct clients with a chainable builder pattern supporting insecure, TLS, and OAuth2 modes
+- **RBAC utilities** -- REST workspace client and helper functions for RBAC resource/subject references
+- **OIDC discovery** -- Built-in OAuth2 client credentials flow with automatic token caching
 
 ## Installation
 
@@ -16,7 +18,7 @@ go get github.com/project-kessel/kessel-sdk-go
 
 ## Quick Start
 
-### gRPC Client
+### Insecure (local development)
 
 ```go
 package main
@@ -26,92 +28,70 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/project-kessel/kessel-sdk-go/kessel/config"
-	v1beta2 "github.com/project-kessel/kessel-sdk-go/kessel/inventory/v1beta2"
-	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/grpc/status"
+	"github.com/project-kessel/kessel-sdk-go/kessel/inventory/v1beta2"
 )
 
 func main() {
-    ctx := context.Background()
-    
-    grpcConfig := config.NewCompatibilityConfig(
-        config.WithGRPCEndpoint("your-kessel-server:9000"),
-        config.WithGRPCInsecure(true),
-    )
+	ctx := context.Background()
 
-    // Using insecure credentials for local development
-    var dialOpts []grpc.DialOption
-    dialOpts = append(dialOpts, grpc.WithTransportCredentials(insecure.NewCredentials()))
-    dialOpts = append(dialOpts,
-        grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(grpcConfig.MaxReceiveMessageSize)),
-        grpc.WithDefaultCallOptions(grpc.MaxCallSendMsgSize(grpcConfig.MaxSendMessageSize)),
-    )
+	inventoryClient, conn, err := v1beta2.NewClientBuilder("localhost:9000").
+		Insecure().
+		Build()
+	if err != nil {
+		log.Fatal("Failed to create gRPC client:", err)
+	}
+	defer conn.Close()
 
-    conn, err := grpc.NewClient(grpcConfig.Url, dialOpts...)
-    if err != nil {
-        log.Fatal("Failed to create gRPC client:", err)
-    }
-    defer func() {
-        if closeErr := conn.Close(); closeErr != nil {
-            log.Printf("Failed to close gRPC client: %v", closeErr)
-        }
-    }()
+	response, err := inventoryClient.Check(ctx, &v1beta2.CheckRequest{
+		Object: &v1beta2.ResourceReference{
+			ResourceType: "host",
+			ResourceId:   "server-123",
+			Reporter:     &v1beta2.ReporterReference{Type: "HBI"},
+		},
+		Relation: "member",
+		Subject: &v1beta2.SubjectReference{
+			Resource: &v1beta2.ResourceReference{
+				ResourceType: "user",
+				ResourceId:   "alice",
+			},
+		},
+	})
+	if err != nil {
+		log.Fatal("Check failed:", err)
+	}
 
-    inventoryClient := v1beta2.NewKesselInventoryServiceClient(conn)
-
-    // Example request using the external API types
-    checkRequest := &v1beta2.CheckRequest{
-        Object: &v1beta2.ResourceReference{
-            ResourceType: "host",
-            ResourceId:   "server-123",
-            Reporter: &v1beta2.ReporterReference{
-                Type: "HBI",
-            },
-        },
-        Relation: "member",
-        Subject: &v1beta2.SubjectReference{
-            Resource: &v1beta2.ResourceReference{
-                ResourceType: "user",
-                ResourceId:   "alice",
-            },
-        },
-    }
-
-    response, err := inventoryClient.Check(ctx, checkRequest)
-    if err != nil {
-        if st, ok := status.FromError(err); ok {
-            switch st.Code() {
-            case codes.Unavailable:
-                log.Fatal("Service unavailable: ", err)
-            case codes.PermissionDenied:
-                log.Fatal("Permission denied: ", err)
-            default:
-                log.Fatal("gRPC connection error: ", err)
-            }
-        } else {
-            log.Fatal("Unknown error: ", err)
-        }
-    }
-
-    log.Printf("Check result: %v", response.Allowed)
+	fmt.Printf("Check result: %v\n", response.Allowed)
 }
 ```
 
-## Configuration
-
-### gRPC Endpoint
-
-Specify the gRPC endpoint:
+### With OAuth2 authentication
 
 ```go
-grpcConfig := config.NewCompatibilityConfig(
-    config.WithGRPCEndpoint("your-kessel-server:9000"),
-    config.WithGRPCInsecure(true),
-)
+inventoryClient, conn, err := v1beta2.NewClientBuilder(endpoint).
+	OAuth2ClientAuthenticated(&oauthCredentials, nil).
+	Build()
 ```
+
+Or bring your own `PerRPCCredentials`:
+
+```go
+inventoryClient, conn, err := v1beta2.NewClientBuilder(endpoint).
+	Authenticated(kesselgrpc.OAuth2CallCredentials(&oauthCredentials), nil).
+	Build()
+```
+
+See the [examples](#examples) section for complete working code.
+
+### ClientBuilder modes
+
+| Method | Transport | Auth | Use case |
+|--------|-----------|------|----------|
+| `.Insecure()` | Plaintext | None | Local development |
+| `.Unauthenticated(tlsCreds)` | TLS | None | TLS without auth |
+| `.Authenticated(perRPC, tlsCreds)` | TLS | Custom PerRPCCredentials | Bring-your-own auth |
+| `.OAuth2ClientAuthenticated(creds, tlsCreds)` | TLS | Built-in OAuth2 | Client credentials flow |
+
+Pass `nil` for `tlsCreds` to use the default TLS configuration.
 
 ## Error Handling
 
@@ -120,36 +100,46 @@ The SDK uses standard gRPC status codes:
 ```go
 response, err := inventoryClient.Check(ctx, checkRequest)
 if err != nil {
-    if st, ok := status.FromError(err); ok {
-        switch st.Code() {
-        case codes.Unavailable:
-            log.Fatal("Service unavailable:", err)
-        case codes.PermissionDenied:
-            log.Fatal("Permission denied:", err)
-        default:
-            log.Fatal("gRPC connection error:", err)
-        }
-    } else {
-        log.Fatal("Unknown error:", err)
-    }
+	if st, ok := status.FromError(err); ok {
+		switch st.Code() {
+		case codes.Unavailable:
+			log.Fatal("Service unavailable:", err)
+		case codes.PermissionDenied:
+			log.Fatal("Permission denied:", err)
+		default:
+			log.Fatal("gRPC error:", err)
+		}
+	} else {
+		log.Fatal("Unknown error:", err)
+	}
 }
 ```
 
-## Examples
+## Project Structure
 
-Complete examples are available in the [`examples/`](./examples/) directory:
-
-- [`examples/grpc/main.go`](./examples/grpc/main.go) - gRPC client usage
-
-To run the examples:
-
-```bash
-# Build examples
-make build
-
-# Run gRPC example
-./bin/grpc-example
 ```
+kessel/
+  auth/                    # OAuth2 client credentials, OIDC discovery, AuthRequest interface
+  config/                  # CompatibilityConfig with functional options (legacy)
+  grpc/                    # OAuth2 PerRPCCredentials wrapper for gRPC
+  inventory/
+    internal/builder/      # Generic ClientBuilder[C] (Go generics)
+    v1/                    # Generated: health service only (stable)
+    v1beta1/               # Generated: legacy per-resource-type services
+    v1beta2/               # Generated: unified API + hand-written client_builder.go
+  rbac/v2/                 # Hand-written: REST workspace client + v1beta2 utility constructors
+examples/
+  grpc/                    # gRPC client examples (6 standalone binaries)
+  rbac/                    # RBAC workspace examples (2 standalone binaries)
+docs/                      # Guideline files for contributors and AI agents
+.github/workflows/         # CI: lint, build-test, buf-generate
+```
+
+**Generated vs. hand-written code:** All `*.pb.go` and `*_grpc.pb.go` files under `kessel/inventory/` are generated by `buf generate` and must not be edited. Hand-written logic lives in `kessel/auth/`, `kessel/config/`, `kessel/grpc/`, `kessel/inventory/internal/builder/`, `kessel/inventory/v1beta2/client_builder.go`, `kessel/rbac/v2/`, and `examples/`.
+
+## API Version
+
+Always use **`v1beta2`** for new code. It provides the unified `KesselInventoryService` with `Check`, `CheckBulk`, `ReportResource`, `DeleteResource`, and more. The `v1beta1` package is legacy and `v1` contains only health endpoints.
 
 ## Development
 
@@ -157,32 +147,100 @@ make build
 
 - Go 1.24 or later
 - Docker or Podman (for linting)
-- Protocol Buffers compiler (for code generation)
+- [buf](https://github.com/bufbuild/buf) (for protobuf code generation)
 
-### Building
+### Build, Test, and Lint
 
 ```bash
 # Install dependencies
 go mod download
 
-# Run linting
-make lint
-
 # Run tests
 make test
 
-# Build examples
+# Run tests with coverage report
+make test-coverage
+
+# Run linting (via Docker/Podman)
+make lint
+
+# Build all example binaries
 make build
 
-# Run tests with coverage
-make test-coverage
+# Format code
+make fmt
+
+# Tidy modules
+make mod-tidy
+
+# Regenerate protobuf files from buf.build
+make generate
 ```
 
 ### Available Make Targets
 
 | Target | Description |
 |--------|-------------|
+| `make test` | Run all tests (`go test -v ./kessel/...`) |
+| `make test-coverage` | Run tests and generate `coverage.html` |
+| `make lint` | Run golangci-lint via Docker/Podman |
+| `make build` | Compile example binaries into `bin/` |
+| `make generate` | Regenerate protobuf files with `buf generate` |
+| `make fmt` | Format Go code |
+| `make mod-tidy` | Run `go mod tidy` |
+| `make clean` | Remove build artifacts |
 | `make help` | Display all available targets |
+
+## Examples
+
+All examples are standalone `package main` binaries. Copy the `.env.sample` file to `.env` and fill in your values before running.
+
+### Inventory (gRPC)
+
+| Example | File | Description |
+|---------|------|-------------|
+| Insecure client | [`examples/grpc/insecure.go`](./examples/grpc/insecure.go) | Connect without TLS for local development and perform a `Check` |
+| Authenticated client | [`examples/grpc/authenticated.go`](./examples/grpc/authenticated.go) | Connect with OIDC discovery and custom `PerRPCCredentials` via `.Authenticated()` |
+| OAuth2 client | [`examples/grpc/oauth2client_authenticated.go`](./examples/grpc/oauth2client_authenticated.go) | Connect with built-in OAuth2 flow via `.OAuth2ClientAuthenticated()` |
+| Report resource | [`examples/grpc/report_resource.go`](./examples/grpc/report_resource.go) | Report a resource with metadata, common, and reporter representations |
+| Delete resource | [`examples/grpc/delete_resource.go`](./examples/grpc/delete_resource.go) | Delete a resource by reference |
+| Bulk check | [`examples/grpc/check_bulk.go`](./examples/grpc/check_bulk.go) | Check multiple permission tuples in a single `CheckBulk` call |
+
+### RBAC (REST + gRPC)
+
+| Example | File | Description |
+|---------|------|-------------|
+| Fetch workspace | [`examples/rbac/fetch_workspace.go`](./examples/rbac/fetch_workspace.go) | Fetch default and root workspaces via the REST API |
+| List workspaces | [`examples/rbac/list_workspaces.go`](./examples/rbac/list_workspaces.go) | List workspaces using gRPC with range-over-func iteration |
+
+### Running examples
+
+```bash
+# Build all examples
+make build
+
+# Run an example
+./bin/insecure-example
+./bin/authenticated-example
+./bin/oauth2client-authenticated-example
+./bin/report-resource-example
+./bin/delete-resource-example
+./bin/check_bulk_example
+./bin/fetch_workspace
+./bin/list_workspaces
+```
+
+## Further Documentation
+
+| Document | Description |
+|----------|-------------|
+| [`AGENTS.md`](./AGENTS.md) | Onboarding guide for AI agents -- architecture, conventions, and pitfalls |
+| [`docs/security-guidelines.md`](./docs/security-guidelines.md) | Auth architecture, TLS, token caching, credential handling |
+| [`docs/api-contracts-guidelines.md`](./docs/api-contracts-guidelines.md) | Protobuf code generation, API versioning, ClientBuilder pattern |
+| [`docs/error-handling-guidelines.md`](./docs/error-handling-guidelines.md) | Error wrapping rules, gRPC status codes, stream/bulk error patterns |
+| [`docs/testing-guidelines.md`](./docs/testing-guidelines.md) | Test styles, table-driven patterns, mocking, naming, coverage |
+| [`docs/performance-guidelines.md`](./docs/performance-guidelines.md) | Connection reuse, token caching, bulk operations, streaming |
+| [`docs/integration-guidelines.md`](./docs/integration-guidelines.md) | Client construction, OIDC flow, REST workspace API, RBAC utilities |
 
 ## Release Instructions
 
