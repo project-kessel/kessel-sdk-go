@@ -115,6 +115,37 @@ if err != nil {
 }
 ```
 
+## Listing Workspaces
+
+The `ListWorkspaces` helper automatically paginates through all workspaces
+a subject can access. Continuation tokens are handled internally.
+
+```go
+import (
+    v1beta2 "github.com/project-kessel/kessel-sdk-go/kessel/inventory/v1beta2"
+    v2 "github.com/project-kessel/kessel-sdk-go/kessel/rbac/v2"
+)
+
+// Lazy iteration (constant memory)
+for resp, err := range v2.ListWorkspaces(ctx, client, subject, "viewer", "") {
+    if err != nil {
+        log.Fatal(err)
+    }
+    fmt.Println(resp.Object.GetResourceId())
+}
+
+// Materialise into a slice
+var all []*v1beta2.StreamedListObjectsResponse
+for resp, err := range v2.ListWorkspaces(ctx, client, subject, "viewer", "") {
+    if err != nil {
+        log.Fatal(err)
+    }
+    all = append(all, resp)
+}
+```
+
+See [`examples/rbac/list_workspaces.go`](./examples/rbac/list_workspaces.go) for a complete working example.
+
 ## Project Structure
 
 ```
