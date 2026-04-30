@@ -28,6 +28,7 @@ build: .env ## Build example binaries
 	@go build -o bin/fetch_workspace ./examples/rbac/fetch_workspace.go
 	@go build -o bin/list_workspaces ./examples/rbac/list_workspaces.go
 	@go build -o bin/check_bulk_example ./examples/grpc/check_bulk.go
+	@go build -o bin/console-principal-example ./examples/console/console_principal.go
 
 .PHONY: lint
 lint: ## Run golangci-lint
@@ -36,7 +37,7 @@ lint: ## Run golangci-lint
 		echo "Linting SDK code..."; \
 		golangci-lint run -v ./kessel/...; \
 		echo "Linting example files individually..."; \
-		for file in examples/grpc/*.go examples/rbac/*.go; do \
+		for file in examples/*/*.go; do \
 			echo "Linting $$file"; \
 			golangci-lint run -v $$file; \
 		done'
