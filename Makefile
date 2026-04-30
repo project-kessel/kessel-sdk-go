@@ -37,7 +37,7 @@ lint: ## Run golangci-lint
 		echo "Linting SDK code..."; \
 		golangci-lint run -v ./kessel/...; \
 		echo "Linting example files individually..."; \
-		for file in examples/grpc/*.go examples/rbac/*.go examples/console/*.go; do \
+		for file in examples/*/*.go; do \
 			echo "Linting $$file"; \
 			golangci-lint run -v $$file; \
 		done'
