@@ -395,7 +395,6 @@ func TestConcurrentTokenAccess(t *testing.T) {
 		mu.Lock()
 		callCount++
 		mu.Unlock()
-		// Add a small delay to simulate network latency
 		time.Sleep(50 * time.Millisecond)
 		response := map[string]interface{}{
 			"access_token": "shared-token-123",
@@ -411,16 +410,19 @@ func TestConcurrentTokenAccess(t *testing.T) {
 
 	credentials := NewOAuth2ClientCredentials("test-client", "test-secret", server.URL)
 
-	// Test concurrent access to GetToken
-	const numGoroutines = 5
+	const numGoroutines = 20
 	results := make(chan RefreshTokenResponse, numGoroutines)
 	errors := make(chan error, numGoroutines)
 
+	var ready sync.WaitGroup
+	ready.Add(numGoroutines)
+	gate := make(chan struct{})
+
 	for i := 0; i < numGoroutines; i++ {
 		go func() {
-			token, err := credentials.GetToken(context.TODO(), GetTokenOptions{
-				ForceRefresh: false,
-			})
+			ready.Done()
+			<-gate
+			token, err := credentials.GetToken(context.TODO(), GetTokenOptions{})
 			if err != nil {
 				errors <- err
 			} else {
@@ -429,7 +431,9 @@ func TestConcurrentTokenAccess(t *testing.T) {
 		}()
 	}
 
-	// Collect results
+	ready.Wait()
+	close(gate)
+
 	var tokens []RefreshTokenResponse
 	for i := 0; i < numGoroutines; i++ {
 		select {
@@ -437,33 +441,188 @@ func TestConcurrentTokenAccess(t *testing.T) {
 			tokens = append(tokens, token)
 		case err := <-errors:
 			t.Errorf("Unexpected error in concurrent access: %v", err)
-		case <-time.After(5 * time.Second):
+		case <-time.After(10 * time.Second):
 			t.Fatal("Timeout waiting for concurrent operations to complete")
 		}
 	}
 
-	// All tokens should be the same (cached after first request)
 	if len(tokens) != numGoroutines {
 		t.Errorf("Expected %d tokens, got %d", numGoroutines, len(tokens))
 	}
 
-	expectedToken := "shared-token-123"
 	for i, token := range tokens {
-		if token.AccessToken != expectedToken {
-			t.Errorf("Token %d differs from expected: expected '%s', got '%s'", i, expectedToken, token.AccessToken)
+		if token.AccessToken != "shared-token-123" {
+			t.Errorf("Token %d: expected 'shared-token-123', got '%s'", i, token.AccessToken)
 		}
 	}
 
-	// The server should have been called only once due to caching and mutex protection
 	mu.Lock()
 	finalCallCount := callCount
 	mu.Unlock()
 
 	if finalCallCount != 1 {
-		t.Logf("Note: Server was called %d times (expected 1, but race conditions may cause multiple calls)", finalCallCount)
-		// Be more lenient here since the exact behavior depends on timing
-		if finalCallCount > numGoroutines {
-			t.Errorf("Expected server to be called at most %d times, but was called %d times", numGoroutines, finalCallCount)
+		t.Errorf("Thundering herd: SSO was called %d times, expected exactly 1", finalCallCount)
+	}
+}
+
+func TestConcurrentTokenAccess_stale_token(t *testing.T) {
+	callCount := 0
+	var mu sync.Mutex
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		callCount++
+		mu.Unlock()
+		time.Sleep(50 * time.Millisecond)
+		response := map[string]interface{}{
+			"access_token": "refreshed-token",
+			"token_type":   "Bearer",
+			"expires_in":   3600,
 		}
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			t.Errorf("Failed to encode test response: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	credentials := NewOAuth2ClientCredentials("test-client", "test-secret", server.URL)
+	credentials.cachedToken = RefreshTokenResponse{
+		AccessToken: "stale-token",
+		ExpiresAt:   time.Now().Add(60 * time.Second), // inside the 300s early-refresh window
+	}
+
+	const numGoroutines = 20
+	results := make(chan RefreshTokenResponse, numGoroutines)
+	errors := make(chan error, numGoroutines)
+
+	var ready sync.WaitGroup
+	ready.Add(numGoroutines)
+	gate := make(chan struct{})
+
+	for i := 0; i < numGoroutines; i++ {
+		go func() {
+			ready.Done()
+			<-gate
+			token, err := credentials.GetToken(context.TODO(), GetTokenOptions{})
+			if err != nil {
+				errors <- err
+			} else {
+				results <- token
+			}
+		}()
+	}
+
+	ready.Wait()
+	close(gate)
+
+	var tokens []RefreshTokenResponse
+	for i := 0; i < numGoroutines; i++ {
+		select {
+		case token := <-results:
+			tokens = append(tokens, token)
+		case err := <-errors:
+			t.Errorf("Unexpected error in concurrent access: %v", err)
+		case <-time.After(10 * time.Second):
+			t.Fatal("Timeout waiting for concurrent operations to complete")
+		}
+	}
+
+	if len(tokens) != numGoroutines {
+		t.Errorf("Expected %d tokens, got %d", numGoroutines, len(tokens))
+	}
+
+	for i, token := range tokens {
+		if token.AccessToken != "refreshed-token" {
+			t.Errorf("Token %d: expected 'refreshed-token', got '%s'", i, token.AccessToken)
+		}
+	}
+
+	mu.Lock()
+	finalCallCount := callCount
+	mu.Unlock()
+
+	if finalCallCount != 1 {
+		t.Errorf("Thundering herd: SSO was called %d times, expected exactly 1", finalCallCount)
+	}
+}
+
+func TestConcurrentForceRefresh(t *testing.T) {
+	callCount := 0
+	var mu sync.Mutex
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		callCount++
+		mu.Unlock()
+		time.Sleep(50 * time.Millisecond)
+		response := map[string]interface{}{
+			"access_token": "force-refreshed-token",
+			"token_type":   "Bearer",
+			"expires_in":   3600,
+		}
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(response); err != nil {
+			t.Errorf("Failed to encode test response: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	credentials := NewOAuth2ClientCredentials("test-client", "test-secret", server.URL)
+	credentials.cachedToken = RefreshTokenResponse{
+		AccessToken: "old-token",
+		ExpiresAt:   time.Now().Add(time.Hour),
+	}
+
+	const numGoroutines = 20
+	results := make(chan RefreshTokenResponse, numGoroutines)
+	errors := make(chan error, numGoroutines)
+
+	var ready sync.WaitGroup
+	ready.Add(numGoroutines)
+	gate := make(chan struct{})
+
+	for i := 0; i < numGoroutines; i++ {
+		go func() {
+			ready.Done()
+			<-gate
+			token, err := credentials.GetToken(context.TODO(), GetTokenOptions{ForceRefresh: true})
+			if err != nil {
+				errors <- err
+			} else {
+				results <- token
+			}
+		}()
+	}
+
+	ready.Wait()
+	close(gate)
+
+	var tokens []RefreshTokenResponse
+	for i := 0; i < numGoroutines; i++ {
+		select {
+		case token := <-results:
+			tokens = append(tokens, token)
+		case err := <-errors:
+			t.Errorf("Unexpected error in concurrent access: %v", err)
+		case <-time.After(10 * time.Second):
+			t.Fatal("Timeout waiting for concurrent operations to complete")
+		}
+	}
+
+	if len(tokens) != numGoroutines {
+		t.Errorf("Expected %d tokens, got %d", numGoroutines, len(tokens))
+	}
+
+	for i, token := range tokens {
+		if token.AccessToken != "force-refreshed-token" {
+			t.Errorf("Token %d: expected 'force-refreshed-token', got '%s'", i, token.AccessToken)
+		}
+	}
+
+	mu.Lock()
+	finalCallCount := callCount
+	mu.Unlock()
+
+	if finalCallCount != 1 {
+		t.Errorf("Thundering herd: SSO was called %d times, expected exactly 1", finalCallCount)
 	}
 }
