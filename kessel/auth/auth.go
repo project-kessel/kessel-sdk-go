@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/zitadel/oidc/v3/pkg/client"
@@ -26,7 +27,8 @@ type OAuth2ClientCredentials struct {
 	clientSecret  string
 	tokenEndpoint string
 	cachedToken   RefreshTokenResponse
-	tokenMutex    sync.Mutex
+	tokenMutex    sync.RWMutex
+	generation    uint64
 }
 
 type FetchOIDCDiscoveryOptions struct {
@@ -58,7 +60,8 @@ func NewOAuth2ClientCredentials(clientId string, clientSecret string, tokenEndpo
 		clientSecret:  clientSecret,
 		tokenEndpoint: tokenEndpoint,
 		cachedToken:   RefreshTokenResponse{},
-		tokenMutex:    sync.Mutex{},
+		tokenMutex:    sync.RWMutex{},
+		generation:    0,
 	}
 }
 
@@ -82,21 +85,33 @@ func (o *OAuth2ClientCredentials) GetToken(ctx context.Context, options GetToken
 		httpClient = http.DefaultClient
 	}
 
+	// Snapshot generation before any lock so all concurrent callers that
+	// decide to refresh see the same value, regardless of lock ordering.
+	generation := atomic.LoadUint64(&o.generation)
+
+	o.tokenMutex.RLock()
 	if !options.ForceRefresh && o.isTokenValid() {
-		return o.cachedToken, nil
+		token := o.cachedToken
+		o.tokenMutex.RUnlock()
+		return token, nil
 	}
+	o.tokenMutex.RUnlock()
 
 	o.tokenMutex.Lock()
 	defer o.tokenMutex.Unlock()
 
-	if options.ForceRefresh {
-		o.cachedToken = RefreshTokenResponse{}
+	if atomic.LoadUint64(&o.generation) != generation && o.isTokenValid() {
+		return o.cachedToken, nil
 	}
 
 	var err error
 	o.cachedToken, err = o.refreshToken(ctx, httpClient)
+	if err != nil {
+		return RefreshTokenResponse{}, err
+	}
+	atomic.AddUint64(&o.generation, 1)
 
-	return o.cachedToken, err
+	return o.cachedToken, nil
 }
 
 func (o *OAuth2ClientCredentials) refreshToken(ctx context.Context, httpClient *http.Client) (RefreshTokenResponse, error) {

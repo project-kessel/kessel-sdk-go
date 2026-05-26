@@ -17,11 +17,14 @@ All OAuth2 authentication uses the `kessel/auth` package backed by `github.com/z
 
 ### Token Caching and Refresh
 
-- `OAuth2ClientCredentials.GetToken` caches tokens in memory with a `sync.Mutex` for thread safety.
+- `OAuth2ClientCredentials.GetToken` caches tokens in memory with a `sync.RWMutex` and a generation counter for thread-safe, coalesced refresh.
+- **Fast path (read lock):** When the cached token is valid, concurrent callers acquire a shared read lock, snapshot the generation counter, and return immediately. Multiple goroutines read concurrently without contention.
+- **Slow path (write lock with double-checked locking):** When the token needs refreshing, callers acquire an exclusive write lock. After acquiring the lock, callers re-check whether the generation counter changed (indicating another goroutine already refreshed). If so, they return the freshly cached token without hitting SSO. This ensures N concurrent callers coalesce into exactly 1 SSO request per refresh cycle.
+- **ForceRefresh coalescing:** Concurrent `ForceRefresh: true` callers also coalesce. The post-lock recheck intentionally ignores `ForceRefresh` so that if another goroutine already refreshed, subsequent callers accept that token rather than issuing redundant SSO requests.
 - Tokens are considered invalid 5 minutes (`expirationWindow = 300` seconds) before their actual expiry. Do not change this buffer without understanding the downstream impact on concurrent callers.
 - If the token response omits `expires_in`, the SDK defaults to 3600 seconds (`defaultExpiresIn`). Do not assume the IdP always returns this field.
 - Use `GetTokenOptions.ForceRefresh = true` only when the caller has evidence the token was rejected (e.g., a 401 response). Do not force-refresh on every call.
-- Tests for concurrent token access exist (`TestConcurrentTokenAccess`). Any change to the caching or mutex logic must pass that test.
+- Tests for concurrent token access exist (`TestConcurrentTokenAccess`, `TestConcurrentTokenAccess_stale_token`, `TestConcurrentForceRefresh`). These use 20-goroutine barrier synchronization and strictly assert exactly 1 SSO call. Any change to the caching or mutex logic must pass all concurrent tests with `-race`.
 
 ## Transport Security (TLS and gRPC)
 
