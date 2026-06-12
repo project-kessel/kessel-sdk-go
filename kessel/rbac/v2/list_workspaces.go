@@ -15,6 +15,7 @@ func ListWorkspaces(
 	subject *v1beta2.SubjectReference,
 	relation string,
 	continuationToken string,
+	consistency *v1beta2.Consistency,
 ) iter.Seq2[*v1beta2.StreamedListObjectsResponse, error] {
 	return func(yield func(*v1beta2.StreamedListObjectsResponse, error) bool) {
 		for {
@@ -27,10 +28,11 @@ func ListWorkspaces(
 			}
 
 			request := &v1beta2.StreamedListObjectsRequest{
-				ObjectType: WorkspaceType(),
-				Relation:   relation,
-				Subject:    subject,
-				Pagination: pagination,
+				ObjectType:  WorkspaceType(),
+				Relation:    relation,
+				Subject:     subject,
+				Pagination:  pagination,
+				Consistency: consistency,
 			}
 
 			stream, err := inventory.StreamedListObjects(ctx, request)
