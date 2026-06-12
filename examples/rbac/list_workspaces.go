@@ -25,6 +25,7 @@ func listWorkspaces() {
 
 	oauthCredentials := auth.NewOAuth2ClientCredentials(os.Getenv("AUTH_CLIENT_ID"), os.Getenv("AUTH_CLIENT_SECRET"), discovered.TokenEndpoint)
 
+	// Setup client
 	inventoryClient, conn, err := v1beta2.NewClientBuilder(os.Getenv("KESSEL_ENDPOINT")).
 		Authenticated(kesselgrpc.OAuth2CallCredentials(&oauthCredentials), nil).
 		Build()
