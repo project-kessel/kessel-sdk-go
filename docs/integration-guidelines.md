@@ -126,7 +126,7 @@ Use the helper functions in `kessel/rbac/v2/utils.go` to build protobuf referenc
 `ListWorkspaces` returns `iter.Seq2[*StreamedListObjectsResponse, error]` and handles pagination internally (continuation pages use limit 1000, follows continuation tokens). Use Go range-over-func:
 
 ```go
-for resp, err := range v2.ListWorkspaces(ctx, inventoryClient, subject, relation, "") {
+for resp, err := range v2.ListWorkspaces(ctx, inventoryClient, subject, relation, "", nil) {
     if err != nil { break }
     // process resp
 }

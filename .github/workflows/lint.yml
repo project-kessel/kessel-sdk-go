@@ -23,6 +23,7 @@ jobs:
           args: --verbose ./kessel/...
       - name: Lint examples individually
         run: |
+          golangci-lint cache clean
           # Lint each example file separately since they each have main()
           for file in examples/*/*.go; do
             echo "Linting $file"
