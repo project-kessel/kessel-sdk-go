@@ -19,11 +19,13 @@ jobs:
         uses: golangci/golangci-lint-action@v9
         with:
           version: latest
+          skip-cache: true
           args: --verbose ./kessel/...
       - name: Lint examples individually
         run: |
+          golangci-lint cache clean
           # Lint each example file separately since they each have main()
-          for file in examples/grpc/*.go examples/rbac/*.go; do
+          for file in examples/*/*.go; do
             echo "Linting $file"
             golangci-lint run --verbose "$file"
           done

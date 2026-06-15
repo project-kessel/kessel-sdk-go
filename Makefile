@@ -6,6 +6,7 @@ GOBIN?=$(shell go env GOBIN)
 GOFLAGS_MOD ?=
 VERSION=$(shell git describe --tags --always)
 DOCKER := $(shell type -P podman || type -P docker)
+GOLANGCI_LINT_IMAGE ?= golangci/golangci-lint:v2.12.2
 GOENV=GOOS=${GOOS} GOARCH=${GOARCH} CGO_ENABLED=1 GOFLAGS="${GOFLAGS_MOD}"
 GOBUILDFLAGS=-gcflags="all=-trimpath=${GOPATH}" -asmflags="all=-trimpath=${GOPATH}"
 
@@ -33,7 +34,7 @@ build: .env ## Build example binaries
 .PHONY: lint
 lint: ## Run golangci-lint
 	@echo "Running golangci-lint"
-	@$(DOCKER) run -t --rm -v $(PWD):/app -w /app golangci/golangci-lint:v2.1 sh -c '\
+	@$(DOCKER) run -t --rm -v $(PWD):/app -w /app $(GOLANGCI_LINT_IMAGE) sh -c '\
 		echo "Linting SDK code..."; \
 		golangci-lint run -v ./kessel/...; \
 		echo "Linting example files individually..."; \

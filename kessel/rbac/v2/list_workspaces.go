@@ -9,6 +9,20 @@ import (
 	v1beta2 "github.com/project-kessel/kessel-sdk-go/kessel/inventory/v1beta2"
 )
 
+// ListWorkspacesOption configures a ListWorkspaces call.
+type ListWorkspacesOption func(*listWorkspacesOptions)
+
+type listWorkspacesOptions struct {
+	consistency *v1beta2.Consistency
+}
+
+// WithConsistency sets the consistency requirement for the listing request.
+func WithConsistency(c *v1beta2.Consistency) ListWorkspacesOption {
+	return func(o *listWorkspacesOptions) {
+		o.consistency = c
+	}
+}
+
 // ListWorkspaces returns a lazy iterator over all workspaces that the given
 // subject has the specified relation to. It wraps the StreamedListObjects gRPC
 // call and automatically handles continuation-token pagination across pages.
@@ -20,6 +34,15 @@ import (
 //	        log.Fatal(err)
 //	    }
 //	    fmt.Println(resp.Object.GetResourceId())
+//	}
+//
+// With a consistency requirement:
+//
+//	for resp, err := range v2.ListWorkspaces(ctx, client, subject, "viewer", "",
+//	    v2.WithConsistency(&v1beta2.Consistency{
+//	        Requirement: &v1beta2.Consistency_MinimizeLatency{MinimizeLatency: true},
+//	    })) {
+//	    // ...
 //	}
 //
 // Materialise into a slice (eager, all results in memory):
@@ -37,7 +60,13 @@ func ListWorkspaces(
 	subject *v1beta2.SubjectReference,
 	relation string,
 	continuationToken string,
+	opts ...ListWorkspacesOption,
 ) iter.Seq2[*v1beta2.StreamedListObjectsResponse, error] {
+	var options listWorkspacesOptions
+	for _, o := range opts {
+		o(&options)
+	}
+
 	return func(yield func(*v1beta2.StreamedListObjectsResponse, error) bool) {
 		for {
 			var pagination *v1beta2.RequestPagination
@@ -49,10 +78,11 @@ func ListWorkspaces(
 			}
 
 			request := &v1beta2.StreamedListObjectsRequest{
-				ObjectType: WorkspaceType(),
-				Relation:   relation,
-				Subject:    subject,
-				Pagination: pagination,
+				ObjectType:  WorkspaceType(),
+				Relation:    relation,
+				Subject:     subject,
+				Pagination:  pagination,
+				Consistency: options.consistency,
 			}
 
 			stream, err := inventory.StreamedListObjects(ctx, request)

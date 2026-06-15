@@ -61,6 +61,7 @@ func TestListWorkspaces(t *testing.T) {
 		streamErr            error
 		relation             string
 		continuationToken    string
+		opts                 []ListWorkspacesOption
 		expectedError        bool
 		expectedRequestCount int
 		validateRequests     func(t *testing.T, requests []*v1beta2.StreamedListObjectsRequest)
@@ -145,6 +146,63 @@ func TestListWorkspaces(t *testing.T) {
 				assert.Equal(t, "resume-from-here", *req.Pagination.ContinuationToken)
 			},
 		},
+		{
+			name: "passes consistency to every request",
+			responses: []*v1beta2.StreamedListObjectsResponse{
+				{Pagination: &v1beta2.ResponsePagination{ContinuationToken: ""}},
+			},
+			relation:          "member",
+			continuationToken: "",
+			opts: []ListWorkspacesOption{
+				WithConsistency(&v1beta2.Consistency{Requirement: &v1beta2.Consistency_MinimizeLatency{MinimizeLatency: true}}),
+			},
+			expectedError:        false,
+			expectedRequestCount: 1,
+			validateRequests: func(t *testing.T, requests []*v1beta2.StreamedListObjectsRequest) {
+				require.Len(t, requests, 1)
+				req := requests[0]
+				require.NotNil(t, req.Consistency)
+				ml, ok := req.Consistency.Requirement.(*v1beta2.Consistency_MinimizeLatency)
+				require.True(t, ok)
+				assert.True(t, ml.MinimizeLatency)
+			},
+		},
+		{
+			name: "nil consistency is fine",
+			responses: []*v1beta2.StreamedListObjectsResponse{
+				{Pagination: &v1beta2.ResponsePagination{ContinuationToken: ""}},
+			},
+			relation:             "member",
+			continuationToken:    "",
+			expectedError:        false,
+			expectedRequestCount: 1,
+			validateRequests: func(t *testing.T, requests []*v1beta2.StreamedListObjectsRequest) {
+				require.Len(t, requests, 1)
+				assert.Nil(t, requests[0].Consistency)
+			},
+		},
+		{
+			name: "consistency preserved across paginated pages",
+			responses: []*v1beta2.StreamedListObjectsResponse{
+				{Pagination: &v1beta2.ResponsePagination{ContinuationToken: "page-2-token"}},
+			},
+			relation:          "view",
+			continuationToken: "",
+			opts: []ListWorkspacesOption{
+				WithConsistency(&v1beta2.Consistency{Requirement: &v1beta2.Consistency_MinimizeLatency{MinimizeLatency: true}}),
+			},
+			expectedError:        false,
+			expectedRequestCount: 2,
+			validateRequests: func(t *testing.T, requests []*v1beta2.StreamedListObjectsRequest) {
+				require.Len(t, requests, 2)
+				for i, req := range requests {
+					require.NotNil(t, req.Consistency, "request %d should have consistency set", i)
+					ml, ok := req.Consistency.Requirement.(*v1beta2.Consistency_MinimizeLatency)
+					require.True(t, ok, "request %d should have MinimizeLatency requirement", i)
+					assert.True(t, ml.MinimizeLatency, "request %d MinimizeLatency should be true", i)
+				}
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -157,7 +215,7 @@ func TestListWorkspaces(t *testing.T) {
 			subject := PrincipalSubject("user123", "redhat")
 
 			var iterationErr error
-			for _, err := range ListWorkspaces(context.Background(), mockClient, subject, tt.relation, tt.continuationToken) {
+			for _, err := range ListWorkspaces(context.Background(), mockClient, subject, tt.relation, tt.continuationToken, tt.opts...) {
 				if err != nil {
 					iterationErr = err
 					break
