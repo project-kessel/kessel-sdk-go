@@ -15,7 +15,7 @@ import (
 //
 // Iterate one-by-one (lazy, low memory):
 //
-//	for resp, err := range v2.ListWorkspaces(ctx, client, subject, "viewer", "") {
+//	for resp, err := range v2.ListWorkspaces(ctx, client, subject, "viewer", "", nil) {
 //	    if err != nil {
 //	        log.Fatal(err)
 //	    }
@@ -25,7 +25,7 @@ import (
 // Materialise into a slice (eager, all results in memory):
 //
 //	var all []*v1beta2.StreamedListObjectsResponse
-//	for resp, err := range v2.ListWorkspaces(ctx, client, subject, "viewer", "") {
+//	for resp, err := range v2.ListWorkspaces(ctx, client, subject, "viewer", "", nil) {
 //	    if err != nil {
 //	        log.Fatal(err)
 //	    }

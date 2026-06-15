@@ -40,7 +40,7 @@ func listWorkspaces() {
 
 	// Iterate one-by-one (lazy, constant memory)
 	fmt.Println("Listing workspaces:")
-	for resp, err := range v2.ListWorkspaces(ctx, inventoryClient, v2.PrincipalSubject("alice", "redhat"), "view_document", "", &v1beta2.Consistency{Requirement: &v1beta2.Consistency_MinimizeLatency{MinimizeLatency: true}}) {
+	for resp, err := range v2.ListWorkspaces(ctx, inventoryClient, v2.PrincipalSubject("alice", "redhat"), "view_document", "", nil) {
 		if err != nil {
 			log.Fatalf("Error listing workspaces: %v", err)
 		}
