@@ -61,7 +61,7 @@ func TestListWorkspaces(t *testing.T) {
 		streamErr            error
 		relation             string
 		continuationToken    string
-		consistency          *v1beta2.Consistency
+		opts                 []ListWorkspacesOption
 		expectedError        bool
 		expectedRequestCount int
 		validateRequests     func(t *testing.T, requests []*v1beta2.StreamedListObjectsRequest)
@@ -73,7 +73,6 @@ func TestListWorkspaces(t *testing.T) {
 			},
 			relation:             "member",
 			continuationToken:    "",
-			consistency:          nil,
 			expectedError:        false,
 			expectedRequestCount: 1,
 			validateRequests: func(t *testing.T, requests []*v1beta2.StreamedListObjectsRequest) {
@@ -91,7 +90,6 @@ func TestListWorkspaces(t *testing.T) {
 			},
 			relation:             "viewer",
 			continuationToken:    "",
-			consistency:          nil,
 			expectedError:        false,
 			expectedRequestCount: 2,
 			validateRequests: func(t *testing.T, requests []*v1beta2.StreamedListObjectsRequest) {
@@ -115,7 +113,6 @@ func TestListWorkspaces(t *testing.T) {
 			},
 			relation:             "admin",
 			continuationToken:    "",
-			consistency:          nil,
 			expectedError:        false,
 			expectedRequestCount: 1,
 			validateRequests: func(t *testing.T, requests []*v1beta2.StreamedListObjectsRequest) {
@@ -128,7 +125,6 @@ func TestListWorkspaces(t *testing.T) {
 			streamErr:            &mockStreamError{message: "stream failed"},
 			relation:             "member",
 			continuationToken:    "",
-			consistency:          nil,
 			expectedError:        true,
 			expectedRequestCount: 1,
 			validateRequests:     nil,
@@ -140,7 +136,6 @@ func TestListWorkspaces(t *testing.T) {
 			},
 			relation:             "member",
 			continuationToken:    "resume-from-here",
-			consistency:          nil,
 			expectedError:        false,
 			expectedRequestCount: 1,
 			validateRequests: func(t *testing.T, requests []*v1beta2.StreamedListObjectsRequest) {
@@ -156,9 +151,11 @@ func TestListWorkspaces(t *testing.T) {
 			responses: []*v1beta2.StreamedListObjectsResponse{
 				{Pagination: &v1beta2.ResponsePagination{ContinuationToken: ""}},
 			},
-			relation:             "member",
-			continuationToken:    "",
-			consistency:          &v1beta2.Consistency{Requirement: &v1beta2.Consistency_MinimizeLatency{MinimizeLatency: true}},
+			relation:          "member",
+			continuationToken: "",
+			opts: []ListWorkspacesOption{
+				WithConsistency(&v1beta2.Consistency{Requirement: &v1beta2.Consistency_MinimizeLatency{MinimizeLatency: true}}),
+			},
 			expectedError:        false,
 			expectedRequestCount: 1,
 			validateRequests: func(t *testing.T, requests []*v1beta2.StreamedListObjectsRequest) {
@@ -177,7 +174,6 @@ func TestListWorkspaces(t *testing.T) {
 			},
 			relation:             "member",
 			continuationToken:    "",
-			consistency:          nil,
 			expectedError:        false,
 			expectedRequestCount: 1,
 			validateRequests: func(t *testing.T, requests []*v1beta2.StreamedListObjectsRequest) {
@@ -190,9 +186,11 @@ func TestListWorkspaces(t *testing.T) {
 			responses: []*v1beta2.StreamedListObjectsResponse{
 				{Pagination: &v1beta2.ResponsePagination{ContinuationToken: "page-2-token"}},
 			},
-			relation:             "view",
-			continuationToken:    "",
-			consistency:          &v1beta2.Consistency{Requirement: &v1beta2.Consistency_MinimizeLatency{MinimizeLatency: true}},
+			relation:          "view",
+			continuationToken: "",
+			opts: []ListWorkspacesOption{
+				WithConsistency(&v1beta2.Consistency{Requirement: &v1beta2.Consistency_MinimizeLatency{MinimizeLatency: true}}),
+			},
 			expectedError:        false,
 			expectedRequestCount: 2,
 			validateRequests: func(t *testing.T, requests []*v1beta2.StreamedListObjectsRequest) {
@@ -217,7 +215,7 @@ func TestListWorkspaces(t *testing.T) {
 			subject := PrincipalSubject("user123", "redhat")
 
 			var iterationErr error
-			for _, err := range ListWorkspaces(context.Background(), mockClient, subject, tt.relation, tt.continuationToken, tt.consistency) {
+			for _, err := range ListWorkspaces(context.Background(), mockClient, subject, tt.relation, tt.continuationToken, tt.opts...) {
 				if err != nil {
 					iterationErr = err
 					break

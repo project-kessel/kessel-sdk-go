@@ -9,23 +9,46 @@ import (
 	v1beta2 "github.com/project-kessel/kessel-sdk-go/kessel/inventory/v1beta2"
 )
 
+// ListWorkspacesOption configures a ListWorkspaces call.
+type ListWorkspacesOption func(*listWorkspacesOptions)
+
+type listWorkspacesOptions struct {
+	consistency *v1beta2.Consistency
+}
+
+// WithConsistency sets the consistency requirement for the listing request.
+func WithConsistency(c *v1beta2.Consistency) ListWorkspacesOption {
+	return func(o *listWorkspacesOptions) {
+		o.consistency = c
+	}
+}
+
 // ListWorkspaces returns a lazy iterator over all workspaces that the given
 // subject has the specified relation to. It wraps the StreamedListObjects gRPC
 // call and automatically handles continuation-token pagination across pages.
 //
 // Iterate one-by-one (lazy, low memory):
 //
-//	for resp, err := range v2.ListWorkspaces(ctx, client, subject, "viewer", "", nil) {
+//	for resp, err := range v2.ListWorkspaces(ctx, client, subject, "viewer", "") {
 //	    if err != nil {
 //	        log.Fatal(err)
 //	    }
 //	    fmt.Println(resp.Object.GetResourceId())
 //	}
 //
+// With a consistency requirement:
+//
+//	for resp, err := range v2.ListWorkspaces(ctx, client, subject, "viewer", "",
+//	    v2.WithConsistency(&v1beta2.Consistency{
+//	        Requirement: &v1beta2.Consistency_MinimizeLatency{MinimizeLatency: true},
+//	    })) {
+//	    // ...
+//	}
+//
 // Materialise into a slice (eager, all results in memory):
 //
 //	var all []*v1beta2.StreamedListObjectsResponse
-//	for resp, err := range v2.ListWorkspaces(ctx, client, subject, "viewer", "", nil) {
+//	for resp, err := range v2.ListWorkspaces(ctx, client, subject, "viewer", "") {
 //	    if err != nil {
 //	        log.Fatal(err)
 //	    }
@@ -37,8 +60,13 @@ func ListWorkspaces(
 	subject *v1beta2.SubjectReference,
 	relation string,
 	continuationToken string,
-	consistency *v1beta2.Consistency,
+	opts ...ListWorkspacesOption,
 ) iter.Seq2[*v1beta2.StreamedListObjectsResponse, error] {
+	var options listWorkspacesOptions
+	for _, o := range opts {
+		o(&options)
+	}
+
 	return func(yield func(*v1beta2.StreamedListObjectsResponse, error) bool) {
 		for {
 			var pagination *v1beta2.RequestPagination
@@ -54,7 +82,7 @@ func ListWorkspaces(
 				Relation:    relation,
 				Subject:     subject,
 				Pagination:  pagination,
-				Consistency: consistency,
+				Consistency: options.consistency,
 			}
 
 			stream, err := inventory.StreamedListObjects(ctx, request)
