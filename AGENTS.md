@@ -115,7 +115,7 @@ Examples live in `examples/` at the repository root, organized by subdirectory:
 ### Makefile and CI integration
 
 Every new example file must be registered:
-1. Add a `go build -o bin/<name>-example ./examples/<subdir>/<file>.go` line to the `build` target in `Makefile`.
+1. Add the corresponding `go build -o bin/<output-name> ./examples/<subdir>/<file>.go` line to the `build` target in the `Makefile`.
 2. The CI lint workflow loops over `examples/*/*.go` — new subdirectories are automatically included.
 3. Run `make build` locally to verify the example compiles.
 
