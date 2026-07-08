@@ -80,6 +80,45 @@ Each file in `examples/grpc/` and `examples/rbac/` is a standalone `package main
 2. Add a `go build -o bin/<name> ./examples/<path>/<file>.go` line to the `build` target in `Makefile`
 3. The CI lint workflow loops over `examples/grpc/*.go` and `examples/rbac/*.go` -- new subdirectories need to be added to both the Makefile lint target and `.github/workflows/lint.yml`
 
+## Maintaining Examples
+
+When public API surface is added or changed (new exported functions, new builder methods, changed method signatures, new service operations), update the `examples/` directory so that examples stay accurate and demonstrate current usage.
+
+### Directory layout
+
+Examples live in `examples/` at the repository root, organized by subdirectory:
+
+| Subdirectory | Purpose |
+|---|---|
+| `grpc/` | gRPC client usage — `ClientBuilder` auth modes, inventory operations |
+| `rbac/` | REST workspace API helpers (`FetchDefaultWorkspace`, `ListWorkspaces`) |
+| `console/` | Console identity (`ConsoleDotPrincipal`) |
+
+### Conventions
+
+- **File naming**: `snake_case.go` matching the operation (e.g., `report_resource.go`, `check_bulk.go`, `fetch_workspace.go`).
+- **Standalone binaries**: Each file is `package main` with its own `main()` function. They are **not automated tests** — they require a live Kessel server.
+- **Env config**: Import `_ "github.com/joho/godotenv/autoload"` for environment variable loading from `.env`. See `.env.sample` for required variables.
+- **Import aliasing**: Use version-based aliases for versioned packages (e.g., `v1beta2 "...kessel/inventory/v1beta2"`, `v2 "...kessel/rbac/v2"`). Alias `kessel/grpc` as `kesselgrpc`.
+- **Connection cleanup**: Always `defer conn.Close()` after `Build()`. Log close errors instead of ignoring them.
+- **Error handling**: Check `status.FromError(err)` and switch on gRPC `codes` for gRPC calls. Use descriptive `log.Fatal` or `panic` messages.
+- **Structure pattern**: Setup (construct client via `ClientBuilder`) → Execute (call the API) → Output (`fmt.Printf` / `log.Printf` the response).
+
+### When to add or update
+
+- **New API operation**: Add an example file in the relevant subdirectory (usually `grpc/`). Follow the structure of existing examples like `report_resource.go`.
+- **New auth mode or builder method**: Add an example in `grpc/` demonstrating the new authentication path, similar to `authenticated.go` vs `oauth2client_authenticated.go`.
+- **New module or package**: Add at least one example. Create a new subdirectory if the module represents a distinct concern (as was done for `rbac/` and `console/`).
+- **Changed method signatures**: Update all existing examples that call the changed method.
+- **Removed API surface**: Remove or update examples that reference removed exports.
+
+### Makefile and CI integration
+
+Every new example file must be registered:
+1. Add the corresponding `go build -o bin/<output-name> ./examples/<subdir>/<file>.go` line to the `build` target in the `Makefile`.
+2. The CI lint workflow loops over `examples/*/*.go` — new subdirectories are automatically included.
+3. Run `make build` locally to verify the example compiles.
+
 ## API Version to Use
 
 Always use `v1beta2` for new code. It is the current active API version with the unified `KesselInventoryService`. The `v1beta1` package is legacy (per-resource-type services) and `v1` contains only health endpoints. Never mix types from different API versions in the same call.
