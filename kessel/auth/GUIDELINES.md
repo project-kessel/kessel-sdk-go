@@ -33,7 +33,7 @@ This package implements OAuth2 client-credentials authentication for the Kessel 
 
 - `isTokenValid()` returns false when the token is empty OR within `expirationWindow` (300 seconds / 5 minutes) of expiry.
 - If the token response omits `expires_in`, `refreshToken` defaults to `defaultExpiresIn` (3600 seconds). Do not assume IdPs always return this field.
-- `ExpiresAt` is computed as `time.Now().Add(duration)` at refresh time -- it is wall-clock based, not monotonic-safe across long sleeps. This is acceptable for the 5-minute buffer.
+- `ExpiresAt` is computed as `time.Now().Add(duration)` at refresh time -- `time.Now()` includes a monotonic reading, which `Add` preserves for in-process comparisons. Serialization or reconstruction from wall-clock components strips the monotonic reading. The 5-minute buffer makes this acceptable in practice.
 
 ## AuthRequest Interface Contract
 

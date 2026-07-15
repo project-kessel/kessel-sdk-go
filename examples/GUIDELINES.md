@@ -47,7 +47,7 @@ The `kesselgrpc` alias avoids collision with `google.golang.org/grpc`. For `kess
 
 ## Error Handling Conventions
 
-Two tiers of error handling are used in examples, depending on what failed:
+Four cases of error handling are used in examples, depending on what failed:
 
 1. **OIDC discovery errors**: Use `panic(err)`. Discovery failure means the environment is misconfigured and there is nothing to clean up.
 2. **ClientBuilder errors**: Use `log.Fatal("Failed to create gRPC client:", err)`.

@@ -17,6 +17,7 @@ Onboarding guide for AI agents working in the kessel-sdk-go repository. This doc
 kessel/
   auth/             # OAuth2 client credentials, OIDC discovery, AuthRequest interface
   config/           # CompatibilityConfig with functional options (legacy pattern)
+  console/          # Console identity helpers (PrincipalFromRHIdentity)
   grpc/             # OAuth2 PerRPCCredentials wrapper for gRPC
   inventory/
     internal/builder/  # Generic ClientBuilder[C] (Go generics)
@@ -24,7 +25,10 @@ kessel/
     v1beta1/           # Generated: legacy per-resource-type services
     v1beta2/           # Generated: current unified API + client_builder.go (hand-written)
   rbac/v2/          # Hand-written: REST workspace client + v1beta2 utility constructors
-examples/           # Standalone main() files; each is a separate binary
+examples/
+  grpc/             # gRPC client examples (standalone binaries)
+  rbac/             # RBAC workspace examples
+  console/          # Console identity examples
 ```
 
 ## Generated vs. Hand-Written Code
@@ -57,7 +61,7 @@ CI runs `make lint` and `make test` (via separate workflows) on every push/PR to
 
 - **Go 1.25** (specified in `go.mod`; CI reads from `go.mod` via `go-version-file`)
 - Module path: `github.com/project-kessel/kessel-sdk-go`
-- The codebase uses Go 1.23+ features: `iter.Seq2` (range-over-func), generics
+- The codebase uses generics (supported since Go 1.18) and Go 1.23+ features: `iter.Seq2`, range-over-func
 
 ## API Version to Use
 
