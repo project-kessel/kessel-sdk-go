@@ -58,6 +58,9 @@ func TestFetchDefaultWorkspace(t *testing.T) {
 				if r.URL.Query().Get("type") != "default" {
 					t.Errorf("Expected type=default in query, got %s", r.URL.Query().Get("type"))
 				}
+				if r.URL.Query().Get("with_ancestry") != "true" {
+					t.Errorf("Expected with_ancestry=true in query, got %s", r.URL.Query().Get("with_ancestry"))
+				}
 				if r.Header.Get("x-rh-rbac-org-id") != "org123" {
 					t.Errorf("Expected org ID header org123, got %s", r.Header.Get("x-rh-rbac-org-id"))
 				}
@@ -205,6 +208,9 @@ func TestFetchRootWorkspace(t *testing.T) {
 				if r.URL.Query().Get("type") != "root" {
 					t.Errorf("Expected type=root in query, got %s", r.URL.Query().Get("type"))
 				}
+				if r.URL.Query().Get("with_ancestry") != "true" {
+					t.Errorf("Expected with_ancestry=true in query, got %s", r.URL.Query().Get("with_ancestry"))
+				}
 			},
 		},
 		{
@@ -342,6 +348,59 @@ func TestFetchWorkspace_DefaultHttpClient(t *testing.T) {
 
 	if err != nil {
 		t.Errorf("Unexpected error with nil HttpClient: %v", err)
+	}
+}
+
+func TestFetchWorkspace_DisableAncestry(t *testing.T) {
+	tests := []struct {
+		name            string
+		disableAncestry bool
+		expectParam     bool
+	}{
+		{
+			name:            "with_ancestry sent by default",
+			disableAncestry: false,
+			expectParam:     true,
+		},
+		{
+			name:            "with_ancestry omitted when disabled",
+			disableAncestry: true,
+			expectParam:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				got := r.URL.Query().Get("with_ancestry")
+				if tt.expectParam {
+					if got != "true" {
+						t.Errorf("Expected with_ancestry=true, got %q", got)
+					}
+				} else {
+					if got != "" {
+						t.Errorf("Expected with_ancestry to be absent, got %q", got)
+					}
+				}
+				response := workspaceAPIResponse{
+					Data: []Workspace{{Id: "ws1", Name: "WS1", Type: "default"}},
+				}
+				w.Header().Set("Content-Type", "application/json")
+				if err := json.NewEncoder(w).Encode(response); err != nil {
+					t.Errorf("Failed to encode test response: %v", err)
+				}
+			}))
+			defer server.Close()
+
+			_, err := FetchDefaultWorkspace(context.Background(), server.URL, "org123", FetchWorkspaceOptions{
+				HttpClient:      http.DefaultClient,
+				DisableAncestry: tt.disableAncestry,
+			})
+
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+		})
 	}
 }
 

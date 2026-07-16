@@ -25,7 +25,9 @@ func fetchWorkspace() {
 
 	oauthCredentials := auth.NewOAuth2ClientCredentials(os.Getenv("AUTH_CLIENT_ID"), os.Getenv("AUTH_CLIENT_SECRET"), discovered.TokenEndpoint)
 
-	// GET /api/rbac/v2/workspaces/?type=default
+	// GET /api/rbac/v2/workspaces/?type=default&with_ancestry=true
+	// with_ancestry=true is sent by default so fallback workspaces are
+	// included even without explicit inventory permission.
 	defaultWorkspace, err := v2.FetchDefaultWorkspace(ctx, "http://localhost:8000", "12345", v2.FetchWorkspaceOptions{
 		HttpClient: http.DefaultClient,
 		Auth: auth.OAuth2AuthRequest(&oauthCredentials, auth.OAuth2AuthRequestOptions{
@@ -39,7 +41,7 @@ func fetchWorkspace() {
 
 	log.Printf("Found default Workspace: %+v", defaultWorkspace)
 
-	// GET /api/rbac/v2/workspaces/?type=root
+	// GET /api/rbac/v2/workspaces/?type=root&with_ancestry=true
 	rootWorkspace, err := v2.FetchRootWorkspace(ctx, "http://localhost:8000", "12345", v2.FetchWorkspaceOptions{
 		HttpClient: http.DefaultClient,
 		Auth: auth.OAuth2AuthRequest(&oauthCredentials, auth.OAuth2AuthRequestOptions{
