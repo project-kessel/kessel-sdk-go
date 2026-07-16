@@ -69,9 +69,11 @@ Every constructor (`PrincipalResource`, `WorkspaceResource`, `RoleResource`, `Wo
 
 ## Testing Conventions
 
+Repo-wide testing rules (white-box packaging, `tt` loop variable, table-driven structure) are in [AGENTS.md -- Testing Conventions](../../../AGENTS.md#testing-conventions). This section covers v2-specific patterns only.
+
 ### Assertion Library
 
-This package uses `testify/assert` and `testify/require`. Other SDK packages (`auth`, `config`, `grpc`) use stdlib only -- do not cross-pollinate.
+This package uses `testify/assert` and `testify/require`. Do not cross-pollinate testify into `auth`, `config`, or `grpc` packages.
 
 ### REST Tests: httptest
 
@@ -80,16 +82,6 @@ HTTP tests use `httptest.NewServer` with per-case handler functions. The test ta
 ### gRPC Tests: Embedded Interface Mocks
 
 Mock the `v1beta2.KesselInventoryServiceClient` interface by embedding it in a struct and overriding `StreamedListObjects`. Mock streams implement `Recv()` returning canned responses then `io.EOF`. Capture requests in a `capturedRequests` slice for assertion.
-
-### White-Box Testing
-
-Test files use `package v2` (same package), not `package v2_test`. This allows access to unexported types like `workspaceAPIResponse` and `listWorkspacesOptions`.
-
-### Test Naming
-
-- Loop variable: always `tt`
-- Subtest names: lowercase with spaces (e.g., `"handles pagination with continuation token"`)
-- Function names: `TestFunctionName` or `TestFunctionName_Scenario`
 
 ## Import Aliases
 

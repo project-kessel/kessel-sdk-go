@@ -57,10 +57,9 @@ This private helper is called by `OAuth2ClientAuthenticated`, `Authenticated`, a
 
 ## Testing
 
+Repo-wide testing rules (white-box packaging, `tt` loop variable, stdlib-only for infrastructure packages) are in [AGENTS.md -- Testing Conventions](../../../../AGENTS.md#testing-conventions).
+
 This package currently has no `_test.go` file. The builder is tested indirectly via the example binaries and integration tests. When adding tests:
-- Use white-box testing (package `builder`, not `builder_test`) -- this is the repo convention for all packages
-- Use stdlib `testing` only -- testify is not used in this package (though it appears in `kessel/rbac/v2` and `kessel/console`)
-- Name the loop variable `tt` in table-driven tests
 - Test that `Build()` returns an error when `target` is empty
 - Test that `Insecure()` clears previously set per-RPC credentials
 - Test auth mode overwriting (calling two modes in sequence)

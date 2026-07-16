@@ -172,7 +172,17 @@ Never read `AUTH_CLIENT_ID` or `AUTH_CLIENT_SECRET` at import time. Load them at
 
 ### Connection lifecycle
 
-Always `defer conn.Close()` after a successful `Build()` call. The caller owns the connection. Reuse a single client/connection for the application's lifetime -- `grpc.NewClient` supports multiplexing. Do not create a new `ClientBuilder`/`Build()` per request.
+Always defer connection close immediately after a successful `Build()` call. Capture and log the close error instead of discarding it:
+
+```go
+defer func() {
+    if closeErr := conn.Close(); closeErr != nil {
+        log.Printf("Failed to close gRPC client: %v", closeErr)
+    }
+}()
+```
+
+Do not use a bare `defer conn.Close()` -- it silently drops close errors. The caller owns the connection. Reuse a single client/connection for the application's lifetime -- `grpc.NewClient` supports multiplexing. Do not create a new `ClientBuilder`/`Build()` per request.
 
 ### Dependency boundaries
 

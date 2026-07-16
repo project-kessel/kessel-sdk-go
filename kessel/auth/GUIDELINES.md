@@ -84,9 +84,9 @@ Do not add new exported types without considering the impact on all three consum
 
 ## Testing Conventions
 
-- **stdlib only.** This package uses `testing` from the standard library. Do not introduce testify (`assert`/`require`). That is reserved for `kessel/rbac/v2`.
-- **White-box tests.** Test files use `package auth` (no `_test` suffix). Tests access unexported fields directly (e.g., `credentials.cachedToken = ...`).
-- **Table-driven with `tt`.** Loop variable is always `tt`. Subtest names are lowercase with spaces.
+Repo-wide testing rules (white-box packaging, `tt` loop variable, table-driven structure) are in [AGENTS.md -- Testing Conventions](../../AGENTS.md#testing-conventions). This section covers auth-specific patterns only.
+
+- **stdlib only.** Do not introduce testify -- reserved for `kessel/rbac/v2`.
 - **Token endpoint mocking.** Use `httptest.NewServer` returning JSON `{"access_token": "...", "token_type": "Bearer", "expires_in": N}`. Never hit a real IdP.
 - **Concurrency tests.** Use barrier synchronization (WaitGroup + gate channel) with 20 goroutines. Assert exactly 1 SSO call. Always run with `-race`.
 - **Context cancellation.** Test `ConfigureRequest` with a short-timeout context to verify error propagation.

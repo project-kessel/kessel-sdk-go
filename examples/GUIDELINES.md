@@ -19,14 +19,7 @@ Rules for writing and maintaining standalone example binaries in `examples/`.
 
 ## Environment Variables
 
-Examples that need configuration read from environment variables via `os.Getenv`. Available variables (defined in `.env.sample`):
-
-| Variable | Purpose |
-|---|---|
-| `KESSEL_ENDPOINT` | gRPC server address (e.g., `localhost:9000`) |
-| `AUTH_CLIENT_ID` | OAuth2 client ID |
-| `AUTH_CLIENT_SECRET` | OAuth2 client secret |
-| `AUTH_DISCOVERY_ISSUER_URL` | OIDC issuer URL for discovery |
+Examples read configuration from environment variables via `os.Getenv`. See the [environment variables table in AGENTS.md](../AGENTS.md#environment-variables) for the full list. The `.env.sample` file at the repo root defines all available variables.
 
 ### godotenv/autoload Import
 
@@ -98,4 +91,4 @@ All gRPC examples follow this three-phase structure:
 
 ## API Version
 
-Always use `v1beta2` for new gRPC examples. The `v1beta1` package is legacy. Never mix types from different API versions in the same example.
+Use `v1beta2` for all new examples. See [AGENTS.md -- API Version to Use](../AGENTS.md#api-version-to-use) for details.
