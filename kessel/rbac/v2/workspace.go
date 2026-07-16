@@ -24,6 +24,11 @@ type FetchWorkspaceOptions struct {
 	// Optionally specify an http.Client or use http.DefaultClient
 	HttpClient *http.Client
 	Auth       auth.AuthRequest
+	// DisableAncestry skips sending with_ancestry=true. By default, the
+	// helpers always send with_ancestry=true so that fallback workspaces
+	// (root, default) are returned even when the caller lacks an explicit
+	// inventory permission grant.
+	DisableAncestry bool
 }
 
 type workspaceAPIResponse struct {
@@ -45,6 +50,9 @@ func fetchWorkspace(ctx context.Context, rbacBaseEndpoint string, orgId string, 
 
 	query := request.URL.Query()
 	query.Set("type", workspaceType)
+	if !options.DisableAncestry {
+		query.Set("with_ancestry", "true")
+	}
 	request.URL.RawQuery = query.Encode()
 
 	request.Header.Set("x-rh-rbac-org-id", orgId)
