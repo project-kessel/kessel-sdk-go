@@ -162,7 +162,7 @@ kessel/
 examples/
   grpc/                    # gRPC client examples (6 standalone binaries)
   rbac/                    # RBAC workspace examples (2 standalone binaries)
-docs/                      # Guideline files for contributors and AI agents
+  console/                 # Console identity examples
 .github/workflows/         # CI: lint, build-test, buf-generate
 ```
 
@@ -176,7 +176,7 @@ Always use **`v1beta2`** for new code. It provides the unified `KesselInventoryS
 
 ### Prerequisites
 
-- Go 1.24 or later
+- Go 1.25 or later
 - Docker or Podman (for linting)
 - [buf](https://github.com/bufbuild/buf) (for protobuf code generation)
 
@@ -266,12 +266,10 @@ make build
 | Document | Description |
 |----------|-------------|
 | [`AGENTS.md`](./AGENTS.md) | Onboarding guide for AI agents -- architecture, conventions, and pitfalls |
-| [`docs/security-guidelines.md`](./docs/security-guidelines.md) | Auth architecture, TLS, token caching, credential handling |
-| [`docs/api-contracts-guidelines.md`](./docs/api-contracts-guidelines.md) | Protobuf code generation, API versioning, ClientBuilder pattern |
-| [`docs/error-handling-guidelines.md`](./docs/error-handling-guidelines.md) | Error wrapping rules, gRPC status codes, stream/bulk error patterns |
-| [`docs/testing-guidelines.md`](./docs/testing-guidelines.md) | Test styles, table-driven patterns, mocking, naming, coverage |
-| [`docs/performance-guidelines.md`](./docs/performance-guidelines.md) | Connection reuse, token caching, bulk operations, streaming |
-| [`docs/integration-guidelines.md`](./docs/integration-guidelines.md) | Client construction, OIDC flow, REST workspace API, RBAC utilities |
+| [`kessel/auth/GUIDELINES.md`](./kessel/auth/GUIDELINES.md) | OAuth2 client credentials, token caching, OIDC discovery |
+| [`kessel/rbac/v2/GUIDELINES.md`](./kessel/rbac/v2/GUIDELINES.md) | REST workspace client, gRPC iterator, utility constructors |
+| [`kessel/inventory/internal/builder/GUIDELINES.md`](./kessel/inventory/internal/builder/GUIDELINES.md) | Generic ClientBuilder, auth modes, three-value return |
+| [`examples/GUIDELINES.md`](./examples/GUIDELINES.md) | Example binary conventions, env config, error handling |
 
 ## Release Instructions
 
@@ -292,7 +290,7 @@ This project follows [Semantic Versioning 2.0.0](https://semver.org/). Version n
 - Write access to the GitHub repository
 - Ensure quality checks are passing
 - Review and update CHANGELOG or release notes as needed
-- Go 1.24 or higher
+- Go 1.25 or higher
 - [buf](https://github.com/bufbuild/buf) for protobuf/gRPC code generation:
   ```bash
   # On macOS
