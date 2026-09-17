@@ -114,7 +114,11 @@ func TestBuildWithValidTarget(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		if closeErr := conn.Close(); closeErr != nil {
+			t.Errorf("failed to close gRPC connection: %v", closeErr)
+		}
+	}()
 }
 
 func TestAuthModeOverwriting(t *testing.T) {
