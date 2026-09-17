@@ -27,7 +27,7 @@ Each mode is a single method that fully configures both transport and per-RPC cr
 | `Authenticated(perRPC, tlsCreds)` | TLS | Caller-provided | Use with `kesselgrpc.OAuth2CallCredentials`. |
 | `OAuth2ClientAuthenticated(creds, tlsCreds)` | TLS | Internal adapter | Wraps `*auth.OAuth2ClientCredentials` automatically. |
 
-For the three TLS modes, passing `nil` as `channelCredentials` falls back to `credentials.NewTLS(&tls.Config{})` (system CA pool). Do not pass `insecure.NewCredentials()` as the channel creds argument -- use `Insecure()` instead.
+For the three TLS modes, passing `nil` as `channelCredentials` falls back to `credentials.NewTLS(&tls.Config{MinVersion: tls.VersionTLS12})` (system CA pool, TLS 1.2 minimum). Do not pass `insecure.NewCredentials()` as the channel creds argument -- use `Insecure()` instead.
 
 ## Internal oauth2PerRPCCreds Adapter
 
