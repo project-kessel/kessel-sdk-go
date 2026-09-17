@@ -150,7 +150,7 @@ These rules apply across the entire repo. For package-specific auth details, see
 
 ### TLS configuration
 
-- Default transport is TLS with system CA pool (`&tls.Config{}`). This is the secure default -- do not change it.
+- Default transport is TLS with system CA pool and TLS 1.2 minimum (`&tls.Config{MinVersion: tls.VersionTLS12}`). This is the secure default -- do not change it.
 - Custom `*tls.Config` should always set `MinVersion: tls.VersionTLS12`.
 - Never set `InsecureSkipVerify: true` in non-test code.
 - The `CompatibilityConfig.TLSConfig` field is tagged `json:"-"` so it is never serialized.

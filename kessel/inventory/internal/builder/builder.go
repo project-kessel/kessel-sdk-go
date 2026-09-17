@@ -11,6 +11,12 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 )
 
+// defaultTLSConfig returns the SDK's default TLS configuration.
+// It uses the system CA pool and requires TLS 1.2 or later.
+func defaultTLSConfig() *tls.Config {
+	return &tls.Config{MinVersion: tls.VersionTLS12}
+}
+
 // ClientBuilder is a generic builder that constructs a typed gRPC client stub and its connection.
 // C is the client interface type (e.g., v1beta2.KesselInventoryServiceClient).
 type ClientBuilder[C any] struct {
@@ -24,7 +30,7 @@ type ClientBuilder[C any] struct {
 func NewClientBuilder[C any](target string, newStub func(grpc.ClientConnInterface) C) *ClientBuilder[C] {
 	return &ClientBuilder[C]{
 		target:             target,
-		channelCredentials: credentials.NewTLS(&tls.Config{}),
+		channelCredentials: credentials.NewTLS(defaultTLSConfig()),
 		newStub:            newStub,
 	}
 }
@@ -34,7 +40,7 @@ func (b *ClientBuilder[C]) setChannelCredentialsOrDefault(channelCredentials cre
 	if channelCredentials != nil {
 		b.channelCredentials = channelCredentials
 	} else {
-		b.channelCredentials = credentials.NewTLS(&tls.Config{})
+		b.channelCredentials = credentials.NewTLS(defaultTLSConfig())
 	}
 }
 
