@@ -45,6 +45,7 @@ func (b *ClientBuilder[C]) setChannelCredentialsOrDefault(channelCredentials cre
 }
 
 func (b *ClientBuilder[C]) OAuth2ClientAuthenticated(oAuth2ClientCredentials *auth.OAuth2ClientCredentials, channelCredentials credentials.TransportCredentials) *ClientBuilder[C] {
+	b.perRPCCredentials = nil
 	b.setChannelCredentialsOrDefault(channelCredentials)
 	if oAuth2ClientCredentials != nil {
 		b.perRPCCredentials = &oauth2PerRPCCreds{creds: oAuth2ClientCredentials, insecure: b.insecure}

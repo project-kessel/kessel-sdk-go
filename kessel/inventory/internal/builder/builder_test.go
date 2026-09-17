@@ -142,6 +142,29 @@ func TestAuthModeOverwriting(t *testing.T) {
 	}
 }
 
+func TestOAuth2ClientAuthenticatedNilClearsStalePerRPCCredentials(t *testing.T) {
+	b := NewClientBuilder("localhost:8080", noopStub)
+
+	// Simulate a prior Authenticated() call that sets perRPCCredentials
+	b.Authenticated(&oauth2PerRPCCreds{}, nil)
+
+	if b.perRPCCredentials == nil {
+		t.Fatal("expected perRPCCredentials to be set after Authenticated()")
+	}
+
+	// Switch to OAuth2 mode with nil credentials — must clear stale per-RPC creds
+	b.OAuth2ClientAuthenticated(nil, nil)
+
+	if b.perRPCCredentials != nil {
+		t.Error("expected OAuth2ClientAuthenticated(nil, nil) to clear stale perRPCCredentials")
+	}
+
+	info := b.channelCredentials.Info()
+	if info.SecurityProtocol != "tls" {
+		t.Errorf("expected security protocol 'tls' after OAuth2ClientAuthenticated(nil, nil), got %q", info.SecurityProtocol)
+	}
+}
+
 func TestOAuth2PerRPCCredsRequireTransportSecurity(t *testing.T) {
 	tests := []struct {
 		name     string
