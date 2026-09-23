@@ -1,5 +1,7 @@
 # Kessel SDK for Go
 
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/project-kessel/kessel-sdk-go/badge)](https://securityscorecards.dev/viewer/?uri=github.com/project-kessel/kessel-sdk-go)
+
 The official Go SDK for the [Kessel](https://github.com/project-kessel) inventory and authorization services. This SDK provides a type-safe gRPC client for managing resources, checking permissions, and interacting with RBAC workspaces.
 
 ## Features
