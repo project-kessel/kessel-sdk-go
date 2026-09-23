@@ -15,7 +15,8 @@ This package implements OAuth2 client-credentials authentication for the Kessel 
 
 ## Construction Rules
 
-- `OAuth2ClientCredentials` fields (`clientId`, `clientSecret`, `tokenEndpoint`) are **unexported**. Always construct via `NewOAuth2ClientCredentials(clientId, clientSecret, tokenEndpoint)`. Struct literals will not compile outside this package.
+- `OAuth2ClientCredentials` fields (`clientId`, `clientSecret`, `tokenEndpoint`) are **unexported**. Always construct via `NewOAuth2ClientCredentials(clientId, clientSecret, tokenEndpoint)` or `NewOAuth2ClientCredentials(clientId, clientSecret, tokenEndpoint, retryOpts)`. Struct literals will not compile outside this package.
+- `NewOAuth2ClientCredentials` accepts an optional variadic `RetryOptions` parameter. If omitted, `DefaultRetryOptions()` is used (3 retries, 0.5s base delay, 2.0s max delay, full jitter). Pass `RetryOptions{MaxRetries: 0}` to disable retries.
 - `NewOAuth2ClientCredentials` returns a **value**, not a pointer. The caller must take its address (`&creds`) before passing it to any consumer. All downstream consumers (`OAuth2AuthRequest`, `OAuth2CallCredentials`, `OAuth2ClientAuthenticated`) accept `*OAuth2ClientCredentials`.
 - `oauth2Auth` is unexported. Callers obtain an `AuthRequest` via `OAuth2AuthRequest(creds, options)` -- they never see the concrete type.
 
@@ -47,6 +48,27 @@ type AuthRequest interface {
 - `ConfigureRequest` calls `GetToken` internally. Callers do not manage tokens directly.
 - The header key is lowercase `"authorization"` (Go's `http.Header.Set` canonicalizes it, but the string literal is lowercase in the source).
 - If the `Auth` field is nil in consumer options, no auth header is sent -- the consumer skips calling `ConfigureRequest` entirely.
+
+## Token Endpoint Retry Logic
+
+`OAuth2ClientCredentials` performs bounded exponential backoff with jitter on OIDC token endpoint requests. Retries are configured via `RetryOptions`:
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `MaxRetries` | `int` | `3` | Max retries after initial request. `0` disables retries. |
+| `BaseDelay` | `float64` | `0.5` | Initial backoff delay in seconds. |
+| `MaxDelay` | `float64` | `2.0` | Max backoff delay cap in seconds. |
+| `Jitter` | `string` | `JitterFull` | `JitterFull` (random in `[0, delay)`) or `JitterNone` (exact delay). |
+
+**Retryable conditions:** `net.Error` (connection refused, DNS failure, timeout), HTTP 429, HTTP 5xx. All other errors (400, 401, 403, etc.) are returned immediately.
+
+**Backoff formula:** `cap = min(MaxDelay, BaseDelay * 2^retryIndex)`. With full jitter: `delay = rand(0, cap)`. With no jitter: `delay = cap`.
+
+**Concurrency:** Retries run inside the write lock. Concurrent callers coalesce -- only one goroutine performs the retry sequence while others wait. This prevents thundering-herd retry storms.
+
+**Context cancellation:** If the context is cancelled during a retry delay, the error is returned immediately.
+
+**Implementation detail:** A `statusCapturingTransport` wraps the HTTP transport to record response status codes. This allows retry classification by HTTP status even when the OIDC library converts responses into opaque errors.
 
 ## Error Handling
 

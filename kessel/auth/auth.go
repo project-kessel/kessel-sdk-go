@@ -2,6 +2,10 @@ package auth
 
 import (
 	"context"
+	"errors"
+	"math"
+	"math/rand/v2"
+	"net"
 	"net/http"
 	"sync"
 	"sync/atomic"
@@ -13,6 +17,13 @@ import (
 const expirationWindow = 300  // 5 minutes in second
 const defaultExpiresIn = 3600 // 1 hour in seconds
 
+const (
+	// JitterFull applies uniform random jitter in [0, delay).
+	JitterFull = "full"
+	// JitterNone disables jitter; the exact computed delay is used.
+	JitterNone = "none"
+)
+
 type OIDCDiscoveryMetadata struct {
 	TokenEndpoint string
 }
@@ -22,6 +33,30 @@ type RefreshTokenResponse struct {
 	ExpiresAt   time.Time
 }
 
+// RetryOptions configures bounded exponential backoff with jitter for
+// OIDC token endpoint requests.
+type RetryOptions struct {
+	// Maximum number of retries after the initial request. 0 disables retries.
+	MaxRetries int
+	// Initial backoff delay in seconds.
+	BaseDelay float64
+	// Maximum backoff delay cap in seconds.
+	MaxDelay float64
+	// Jitter strategy: JitterFull (default) or JitterNone.
+	Jitter string
+}
+
+// DefaultRetryOptions returns the default retry configuration:
+// 3 retries, 0.5s base delay, 2.0s max delay, full jitter.
+func DefaultRetryOptions() RetryOptions {
+	return RetryOptions{
+		MaxRetries: 3,
+		BaseDelay:  0.5,
+		MaxDelay:   2.0,
+		Jitter:     JitterFull,
+	}
+}
+
 type OAuth2ClientCredentials struct {
 	clientId      string
 	clientSecret  string
@@ -29,6 +64,7 @@ type OAuth2ClientCredentials struct {
 	cachedToken   RefreshTokenResponse
 	tokenMutex    sync.RWMutex
 	generation    uint64
+	retry         RetryOptions
 }
 
 type FetchOIDCDiscoveryOptions struct {
@@ -54,7 +90,30 @@ type requestToken struct {
 	GrantType    string `schema:"grant_type"`
 }
 
-func NewOAuth2ClientCredentials(clientId string, clientSecret string, tokenEndpoint string) OAuth2ClientCredentials {
+// statusCapturingTransport wraps an http.RoundTripper to record the
+// HTTP status code of the most recent response. This allows retry
+// logic to classify errors by status code even when the OIDC library
+// converts the response into an opaque error.
+type statusCapturingTransport struct {
+	base       http.RoundTripper
+	lastStatus int
+}
+
+func (t *statusCapturingTransport) RoundTrip(req *http.Request) (*http.Response, error) {
+	resp, err := t.base.RoundTrip(req)
+	if resp != nil {
+		t.lastStatus = resp.StatusCode
+	} else {
+		t.lastStatus = 0
+	}
+	return resp, err
+}
+
+func NewOAuth2ClientCredentials(clientId string, clientSecret string, tokenEndpoint string, opts ...RetryOptions) OAuth2ClientCredentials {
+	retry := DefaultRetryOptions()
+	if len(opts) > 0 {
+		retry = opts[0]
+	}
 	return OAuth2ClientCredentials{
 		clientId:      clientId,
 		clientSecret:  clientSecret,
@@ -62,6 +121,7 @@ func NewOAuth2ClientCredentials(clientId string, clientSecret string, tokenEndpo
 		cachedToken:   RefreshTokenResponse{},
 		tokenMutex:    sync.RWMutex{},
 		generation:    0,
+		retry:         retry,
 	}
 }
 
@@ -105,13 +165,59 @@ func (o *OAuth2ClientCredentials) GetToken(ctx context.Context, options GetToken
 	}
 
 	var err error
-	o.cachedToken, err = o.refreshToken(ctx, httpClient)
+	o.cachedToken, err = o.refreshTokenWithRetries(ctx, httpClient)
 	if err != nil {
 		return RefreshTokenResponse{}, err
 	}
 	atomic.AddUint64(&o.generation, 1)
 
 	return o.cachedToken, nil
+}
+
+func (o *OAuth2ClientCredentials) refreshTokenWithRetries(ctx context.Context, httpClient *http.Client) (RefreshTokenResponse, error) {
+	maxRetries := o.retry.MaxRetries
+	if maxRetries <= 0 {
+		return o.refreshToken(ctx, httpClient)
+	}
+
+	transport := httpClient.Transport
+	if transport == nil {
+		transport = http.DefaultTransport
+	}
+
+	capture := &statusCapturingTransport{base: transport}
+	retryClient := &http.Client{
+		Transport:     capture,
+		Timeout:       httpClient.Timeout,
+		CheckRedirect: httpClient.CheckRedirect,
+		Jar:           httpClient.Jar,
+	}
+
+	var lastErr error
+	for attempt := range maxRetries + 1 {
+		if attempt > 0 {
+			delay := o.retryDelay(attempt - 1)
+			select {
+			case <-time.After(delay):
+			case <-ctx.Done():
+				return RefreshTokenResponse{}, ctx.Err()
+			}
+		}
+
+		capture.lastStatus = 0
+		resp, err := o.refreshToken(ctx, retryClient)
+		if err == nil {
+			return resp, nil
+		}
+
+		lastErr = err
+
+		if !isRetryableError(err, capture.lastStatus) {
+			return RefreshTokenResponse{}, err
+		}
+	}
+
+	return RefreshTokenResponse{}, lastErr
 }
 
 func (o *OAuth2ClientCredentials) refreshToken(ctx context.Context, httpClient *http.Client) (RefreshTokenResponse, error) {
@@ -149,6 +255,34 @@ func (o *OAuth2ClientCredentials) isTokenValid() bool {
 	}
 
 	return time.Now().Add(time.Duration(expirationWindow) * time.Second).Before(o.cachedToken.ExpiresAt)
+}
+
+// retryDelay computes the backoff delay for the given retry index using
+// bounded exponential backoff. With full jitter, the delay is a random
+// value in [0, cap). With no jitter, the exact cap is used.
+func (o *OAuth2ClientCredentials) retryDelay(retryIndex int) time.Duration {
+	computed := min(o.retry.MaxDelay, o.retry.BaseDelay*math.Pow(2, float64(retryIndex)))
+	if o.retry.Jitter == JitterNone {
+		return time.Duration(computed * float64(time.Second))
+	}
+	return time.Duration(rand.Float64() * computed * float64(time.Second))
+}
+
+// isRetryableError returns true for transient errors that should be retried:
+// network/connection errors, timeouts, HTTP 429, and HTTP 5xx responses.
+func isRetryableError(err error, httpStatus int) bool {
+	// Network and timeout errors (connection refused, DNS failure, etc.)
+	var netErr net.Error
+	if errors.As(err, &netErr) {
+		return true
+	}
+
+	// HTTP 429 Too Many Requests or 5xx server errors
+	if httpStatus == http.StatusTooManyRequests || httpStatus >= 500 {
+		return true
+	}
+
+	return false
 }
 
 func (o oauth2TokenEndpointCaller) TokenEndpoint() string {
