@@ -60,7 +60,7 @@ type AuthRequest interface {
 | `MaxDelay` | `float64` | `2.0` | Max backoff delay cap in seconds. |
 | `Jitter` | `string` | `JitterFull` | `JitterFull` (random in `[0, delay)`) or `JitterNone` (exact delay). |
 
-**Retryable conditions:** `net.Error` (connection refused, DNS failure, timeout), HTTP 429, HTTP 5xx. All other errors (400, 401, 403, etc.) are returned immediately.
+**Retryable conditions:** Transient network errors (`net.Error` inside `*url.Error`, or bare `net.Error`), timeouts, HTTP 429, HTTP 5xx. Permanent errors wrapped in `*url.Error` (TLS certificate failures, unsupported protocol schemes, `context.Canceled`) are **not** retried. All other errors (400, 401, 403, etc.) are returned immediately.
 
 **Backoff formula:** `cap = min(MaxDelay, BaseDelay * 2^retryIndex)`. With full jitter: `delay = rand(0, cap)`. With no jitter: `delay = cap`.
 
@@ -85,6 +85,8 @@ if httpClient == nil {
 }
 ```
 Do not create new `http.Client` instances inside this package. The caller controls timeouts and TLS.
+
+**Exception:** `refreshTokenWithRetries` uses a shallow struct copy (`clientCopy := *httpClient`) with only `Transport` replaced by `statusCapturingTransport`. This preserves all caller-configured fields automatically and is not considered a new client instance.
 
 ## OIDC Discovery
 

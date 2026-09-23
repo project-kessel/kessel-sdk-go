@@ -24,6 +24,7 @@ build: .env ## Build example binaries
 	@go build -o bin/insecure-example ./examples/grpc/insecure.go
 	@go build -o bin/authenticated-example ./examples/grpc/authenticated.go
 	@go build -o bin/oauth2client-authenticated-example ./examples/grpc/oauth2client_authenticated.go
+	@go build -o bin/oauth2client-retry-example ./examples/grpc/oauth2client_retry.go
 	@go build -o bin/report-resource-example ./examples/grpc/report_resource.go
 	@go build -o bin/delete-resource-example ./examples/grpc/delete_resource.go
 	@go build -o bin/fetch_workspace ./examples/rbac/fetch_workspace.go

@@ -7,6 +7,7 @@ import (
 	"math/rand/v2"
 	"net"
 	"net/http"
+	"net/url"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -112,7 +113,17 @@ func (t *statusCapturingTransport) RoundTrip(req *http.Request) (*http.Response,
 func NewOAuth2ClientCredentials(clientId string, clientSecret string, tokenEndpoint string, opts ...RetryOptions) OAuth2ClientCredentials {
 	retry := DefaultRetryOptions()
 	if len(opts) > 0 {
-		retry = opts[0]
+		o := opts[0]
+		retry.MaxRetries = o.MaxRetries
+		if o.BaseDelay > 0 {
+			retry.BaseDelay = o.BaseDelay
+		}
+		if o.MaxDelay > 0 {
+			retry.MaxDelay = o.MaxDelay
+		}
+		if o.Jitter != "" {
+			retry.Jitter = o.Jitter
+		}
 	}
 	return OAuth2ClientCredentials{
 		clientId:      clientId,
@@ -186,12 +197,9 @@ func (o *OAuth2ClientCredentials) refreshTokenWithRetries(ctx context.Context, h
 	}
 
 	capture := &statusCapturingTransport{base: transport}
-	retryClient := &http.Client{
-		Transport:     capture,
-		Timeout:       httpClient.Timeout,
-		CheckRedirect: httpClient.CheckRedirect,
-		Jar:           httpClient.Jar,
-	}
+	clientCopy := *httpClient
+	clientCopy.Transport = capture
+	retryClient := &clientCopy
 
 	var lastErr error
 	for attempt := range maxRetries + 1 {
@@ -270,7 +278,21 @@ func (o *OAuth2ClientCredentials) retryDelay(retryIndex int) time.Duration {
 
 // isRetryableError returns true for transient errors that should be retried:
 // network/connection errors, timeouts, HTTP 429, and HTTP 5xx responses.
+// Permanent errors wrapped in *url.Error (TLS failures, unsupported schemes,
+// context cancellation) are not retried.
 func isRetryableError(err error, httpStatus int) bool {
+	// *url.Error wraps all http.Client transport errors and satisfies
+	// net.Error, so inspect the underlying cause first to avoid retrying
+	// permanent failures (e.g. TLS certificate errors, unsupported schemes).
+	var urlErr *url.Error
+	if errors.As(err, &urlErr) {
+		if urlErr.Timeout() {
+			return true
+		}
+		var inner net.Error
+		return errors.As(urlErr.Err, &inner)
+	}
+
 	// Network and timeout errors (connection refused, DNS failure, etc.)
 	var netErr net.Error
 	if errors.As(err, &netErr) {

@@ -8,6 +8,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"sync"
 	"testing"
 	"time"
@@ -80,6 +81,25 @@ func TestMakeOAuth2ClientCredentials_disabled_retry(t *testing.T) {
 
 	if credentials.retry.MaxRetries != 0 {
 		t.Errorf("Expected MaxRetries 0, got %d", credentials.retry.MaxRetries)
+	}
+}
+
+func TestMakeOAuth2ClientCredentials_partial_retry(t *testing.T) {
+	// Only MaxRetries set — BaseDelay, MaxDelay, Jitter should keep defaults
+	retry := RetryOptions{MaxRetries: 5}
+	credentials := NewOAuth2ClientCredentials("id", "secret", "https://example.com/token", retry)
+
+	if credentials.retry.MaxRetries != 5 {
+		t.Errorf("Expected MaxRetries 5, got %d", credentials.retry.MaxRetries)
+	}
+	if credentials.retry.BaseDelay != 0.5 {
+		t.Errorf("Expected default BaseDelay 0.5, got %f", credentials.retry.BaseDelay)
+	}
+	if credentials.retry.MaxDelay != 2.0 {
+		t.Errorf("Expected default MaxDelay 2.0, got %f", credentials.retry.MaxDelay)
+	}
+	if credentials.retry.Jitter != JitterFull {
+		t.Errorf("Expected default Jitter %q, got %q", JitterFull, credentials.retry.Jitter)
 	}
 }
 
@@ -832,6 +852,36 @@ func TestIsRetryableError(t *testing.T) {
 			httpStatus: 0,
 			expected:   false,
 		},
+		{
+			name: "url error wrapping unsupported scheme not retryable",
+			err: &url.Error{
+				Op:  "Get",
+				URL: "ftp://example.com/token",
+				Err: errors.New("unsupported protocol scheme \"ftp\""),
+			},
+			httpStatus: 0,
+			expected:   false,
+		},
+		{
+			name: "url error wrapping context canceled not retryable",
+			err: &url.Error{
+				Op:  "Get",
+				URL: "https://example.com/token",
+				Err: context.Canceled,
+			},
+			httpStatus: 0,
+			expected:   false,
+		},
+		{
+			name: "url error wrapping net error is retryable",
+			err: &url.Error{
+				Op:  "Get",
+				URL: "https://example.com/token",
+				Err: &net.OpError{Op: "dial", Err: fmt.Errorf("connection refused")},
+			},
+			httpStatus: 0,
+			expected:   true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -857,7 +907,9 @@ func TestStatusCapturingTransport(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Unexpected error: %v", err)
 	}
-	resp.Body.Close()
+	if err := resp.Body.Close(); err != nil {
+		t.Errorf("Failed to close body: %v", err)
+	}
 
 	if capture.lastStatus != http.StatusServiceUnavailable {
 		t.Errorf("Expected status %d, got %d", http.StatusServiceUnavailable, capture.lastStatus)
@@ -884,11 +936,13 @@ func TestRefreshTokenWithRetries_success_first_attempt(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		callCount++
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{
 			"access_token": "token-ok",
 			"token_type":   "Bearer",
 			"expires_in":   3600,
-		})
+		}); err != nil {
+			t.Errorf("Failed to encode test response: %v", err)
+		}
 	}))
 	defer server.Close()
 
@@ -920,11 +974,13 @@ func TestRefreshTokenWithRetries_retry_on_500(t *testing.T) {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{
 			"access_token": "recovered-token",
 			"token_type":   "Bearer",
 			"expires_in":   3600,
-		})
+		}); err != nil {
+			t.Errorf("Failed to encode test response: %v", err)
+		}
 	}))
 	defer server.Close()
 
@@ -961,11 +1017,13 @@ func TestRefreshTokenWithRetries_retry_on_429(t *testing.T) {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{
 			"access_token": "after-429",
 			"token_type":   "Bearer",
 			"expires_in":   3600,
-		})
+		}); err != nil {
+			t.Errorf("Failed to encode test response: %v", err)
+		}
 	}))
 	defer server.Close()
 
@@ -1151,11 +1209,13 @@ func TestGetToken_retries_500_then_succeeds(t *testing.T) {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{
 			"access_token": "retry-success",
 			"token_type":   "Bearer",
 			"expires_in":   3600,
-		})
+		}); err != nil {
+			t.Errorf("Failed to encode test response: %v", err)
+		}
 	}))
 	defer server.Close()
 
@@ -1196,11 +1256,13 @@ func TestGetToken_concurrent_with_retries(t *testing.T) {
 		}
 		time.Sleep(50 * time.Millisecond)
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{
 			"access_token": "coalesced-token",
 			"token_type":   "Bearer",
 			"expires_in":   3600,
-		})
+		}); err != nil {
+			t.Errorf("Failed to encode test response: %v", err)
+		}
 	}))
 	defer server.Close()
 
@@ -1267,11 +1329,13 @@ func TestRefreshTokenWithRetries_preserves_nil_transport(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		callCount++
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{
 			"access_token": "nil-transport-ok",
 			"token_type":   "Bearer",
 			"expires_in":   3600,
-		})
+		}); err != nil {
+			t.Errorf("Failed to encode test response: %v", err)
+		}
 	}))
 	defer server.Close()
 
@@ -1301,11 +1365,13 @@ func TestRefreshTokenWithRetries_retry_on_502(t *testing.T) {
 			return
 		}
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{
 			"access_token": "after-502",
 			"token_type":   "Bearer",
 			"expires_in":   3600,
-		})
+		}); err != nil {
+			t.Errorf("Failed to encode test response: %v", err)
+		}
 	}))
 	defer server.Close()
 
