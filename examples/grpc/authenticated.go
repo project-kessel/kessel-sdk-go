@@ -26,6 +26,26 @@ func authenticated() {
 
 	oauthCredentials := auth.NewOAuth2ClientCredentials(os.Getenv("AUTH_CLIENT_ID"), os.Getenv("AUTH_CLIENT_SECRET"), discovered.TokenEndpoint)
 
+	// Token endpoint retries are enabled by default (3 retries, 0.5s base delay,
+	// 2.0s max delay, full jitter). To customize:
+	//
+	//   retryOpts := auth.RetryOptions{
+	//       MaxRetries: 5,
+	//       BaseDelay:  1.0,
+	//       MaxDelay:   10.0,
+	//       Jitter:     auth.JitterNone,
+	//   }
+	//   oauthCredentials := auth.NewOAuth2ClientCredentials(
+	//       os.Getenv("AUTH_CLIENT_ID"),
+	//       os.Getenv("AUTH_CLIENT_SECRET"),
+	//       discovered.TokenEndpoint,
+	//       retryOpts,
+	//   )
+	//
+	// To disable retries entirely:
+	//
+	//   auth.NewOAuth2ClientCredentials(..., auth.RetryOptions{MaxRetries: 0})
+
 	inventoryClient, conn, err := v1beta2.NewClientBuilder(os.Getenv("KESSEL_ENDPOINT")).
 		Authenticated(kesselgrpc.OAuth2CallCredentials(&oauthCredentials), nil).
 		Build()
