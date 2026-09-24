@@ -37,8 +37,15 @@ type RefreshTokenResponse struct {
 
 // RetryOptions configures bounded exponential backoff with jitter for
 // OIDC token endpoint requests.
+//
+// When passing RetryOptions to [NewOAuth2ClientCredentials], always set
+// MaxRetries explicitly. The zero value (0) disables retries, so passing
+// RetryOptions with only BaseDelay, MaxDelay, or Jitter set will silently
+// disable retries.
 type RetryOptions struct {
 	// Maximum number of retries after the initial request. 0 disables retries.
+	// Always set this field explicitly when passing RetryOptions: the zero
+	// value disables retries even if other fields are customized.
 	MaxRetries int
 	// Initial backoff delay in seconds.
 	BaseDelay float64
@@ -111,6 +118,11 @@ func (t *statusCapturingTransport) RoundTrip(req *http.Request) (*http.Response,
 	return resp, err
 }
 
+// NewOAuth2ClientCredentials creates an OAuth2 client-credentials provider.
+// If no RetryOptions are passed, DefaultRetryOptions() is used (3 retries,
+// exponential backoff with full jitter). When passing RetryOptions, always
+// set MaxRetries explicitly — a zero-value MaxRetries disables retries even
+// if only BaseDelay, MaxDelay, or Jitter are customized.
 func NewOAuth2ClientCredentials(clientId string, clientSecret string, tokenEndpoint string, opts ...RetryOptions) OAuth2ClientCredentials {
 	retry := DefaultRetryOptions()
 	if len(opts) > 0 {

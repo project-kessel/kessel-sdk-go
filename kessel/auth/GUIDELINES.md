@@ -55,7 +55,7 @@ type AuthRequest interface {
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `MaxRetries` | `int` | `3` | Max retries after initial request. `0` disables retries. |
+| `MaxRetries` | `int` | `3` | Max retries after initial request. `0` disables retries. Always set explicitly when passing `RetryOptions` — the zero value disables retries even if only delays or jitter are customized. |
 | `BaseDelay` | `float64` | `0.5` | Initial backoff delay in seconds. |
 | `MaxDelay` | `float64` | `2.0` | Max backoff delay cap in seconds. |
 | `Jitter` | `string` | `JitterFull` | `JitterFull` (random in `[0, delay)`) or `JitterNone` (exact delay). |
