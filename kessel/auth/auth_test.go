@@ -991,129 +991,106 @@ func TestRefreshTokenWithRetries_success_first_attempt(t *testing.T) {
 	}
 }
 
-func TestRefreshTokenWithRetries_retry_on_500(t *testing.T) {
-	callCount := 0
-	var mu sync.Mutex
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		mu.Lock()
-		callCount++
-		current := callCount
-		mu.Unlock()
-
-		if current <= 2 {
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(map[string]interface{}{
-			"access_token": "recovered-token",
-			"token_type":   "Bearer",
-			"expires_in":   3600,
-		}); err != nil {
-			t.Errorf("Failed to encode test response: %v", err)
-		}
-	}))
-	defer server.Close()
-
-	retry := RetryOptions{MaxRetries: 3, BaseDelay: 0.01, MaxDelay: 0.02, Jitter: JitterNone}
-	credentials := NewOAuth2ClientCredentials("client", "secret", server.URL, retry)
-	resp, err := credentials.refreshTokenWithRetries(context.Background(), http.DefaultClient)
-
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	if resp.AccessToken != "recovered-token" {
-		t.Errorf("Expected 'recovered-token', got %q", resp.AccessToken)
-	}
-
-	mu.Lock()
-	final := callCount
-	mu.Unlock()
-	if final != 3 {
-		t.Errorf("Expected 3 calls (2 failures + 1 success), got %d", final)
-	}
-}
-
-func TestRefreshTokenWithRetries_retry_on_429(t *testing.T) {
-	callCount := 0
-	var mu sync.Mutex
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		mu.Lock()
-		callCount++
-		current := callCount
-		mu.Unlock()
-
-		if current == 1 {
-			http.Error(w, "Too Many Requests", http.StatusTooManyRequests)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(map[string]interface{}{
-			"access_token": "after-429",
-			"token_type":   "Bearer",
-			"expires_in":   3600,
-		}); err != nil {
-			t.Errorf("Failed to encode test response: %v", err)
-		}
-	}))
-	defer server.Close()
-
-	retry := RetryOptions{MaxRetries: 3, BaseDelay: 0.01, MaxDelay: 0.02, Jitter: JitterNone}
-	credentials := NewOAuth2ClientCredentials("client", "secret", server.URL, retry)
-	resp, err := credentials.refreshTokenWithRetries(context.Background(), http.DefaultClient)
-
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	if resp.AccessToken != "after-429" {
-		t.Errorf("Expected 'after-429', got %q", resp.AccessToken)
+func TestRefreshTokenWithRetries_http_status_codes(t *testing.T) {
+	tests := []struct {
+		name          string
+		failStatus    int
+		failCount     int
+		maxRetries    int
+		expectSuccess bool
+		expectedCalls int
+	}{
+		{
+			name:          "retry on 500 then succeed",
+			failStatus:    http.StatusInternalServerError,
+			failCount:     2,
+			maxRetries:    3,
+			expectSuccess: true,
+			expectedCalls: 3,
+		},
+		{
+			name:          "retry on 429 then succeed",
+			failStatus:    http.StatusTooManyRequests,
+			failCount:     1,
+			maxRetries:    3,
+			expectSuccess: true,
+			expectedCalls: 2,
+		},
+		{
+			name:          "retry on 502 then succeed",
+			failStatus:    http.StatusBadGateway,
+			failCount:     1,
+			maxRetries:    3,
+			expectSuccess: true,
+			expectedCalls: 2,
+		},
+		{
+			name:          "no retry on 401",
+			failStatus:    http.StatusUnauthorized,
+			failCount:     1,
+			maxRetries:    3,
+			expectSuccess: false,
+			expectedCalls: 1,
+		},
+		{
+			name:          "no retry on 400",
+			failStatus:    http.StatusBadRequest,
+			failCount:     1,
+			maxRetries:    3,
+			expectSuccess: false,
+			expectedCalls: 1,
+		},
 	}
 
-	mu.Lock()
-	final := callCount
-	mu.Unlock()
-	if final != 2 {
-		t.Errorf("Expected 2 calls (1 failure + 1 success), got %d", final)
-	}
-}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			callCount := 0
+			var mu sync.Mutex
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				mu.Lock()
+				callCount++
+				current := callCount
+				mu.Unlock()
 
-func TestRefreshTokenWithRetries_no_retry_on_401(t *testing.T) {
-	callCount := 0
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		callCount++
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
-	}))
-	defer server.Close()
+				if current <= tt.failCount {
+					http.Error(w, http.StatusText(tt.failStatus), tt.failStatus)
+					return
+				}
+				w.Header().Set("Content-Type", "application/json")
+				if err := json.NewEncoder(w).Encode(map[string]interface{}{
+					"access_token": "recovered",
+					"token_type":   "Bearer",
+					"expires_in":   3600,
+				}); err != nil {
+					t.Errorf("Failed to encode test response: %v", err)
+				}
+			}))
+			defer server.Close()
 
-	retry := RetryOptions{MaxRetries: 3, BaseDelay: 0.01, MaxDelay: 0.02, Jitter: JitterNone}
-	credentials := NewOAuth2ClientCredentials("client", "secret", server.URL, retry)
-	_, err := credentials.refreshTokenWithRetries(context.Background(), http.DefaultClient)
+			retry := RetryOptions{MaxRetries: tt.maxRetries, BaseDelay: 0.01, MaxDelay: 0.02, Jitter: JitterNone}
+			credentials := NewOAuth2ClientCredentials("client", "secret", server.URL, retry)
+			resp, err := credentials.refreshTokenWithRetries(context.Background(), http.DefaultClient)
 
-	if err == nil {
-		t.Fatal("Expected error but got none")
-	}
-	if callCount != 1 {
-		t.Errorf("Expected 1 call (no retry for 401), got %d", callCount)
-	}
-}
+			if tt.expectSuccess {
+				if err != nil {
+					t.Fatalf("Expected success, got error: %v", err)
+				}
+				if resp.AccessToken != "recovered" {
+					t.Errorf("Expected token %q, got %q", "recovered", resp.AccessToken)
+				}
+			} else {
+				if err == nil {
+					t.Fatal("Expected error but got none")
+				}
+			}
 
-func TestRefreshTokenWithRetries_no_retry_on_400(t *testing.T) {
-	callCount := 0
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		callCount++
-		http.Error(w, "Bad Request", http.StatusBadRequest)
-	}))
-	defer server.Close()
-
-	retry := RetryOptions{MaxRetries: 3, BaseDelay: 0.01, MaxDelay: 0.02, Jitter: JitterNone}
-	credentials := NewOAuth2ClientCredentials("client", "secret", server.URL, retry)
-	_, err := credentials.refreshTokenWithRetries(context.Background(), http.DefaultClient)
-
-	if err == nil {
-		t.Fatal("Expected error but got none")
-	}
-	if callCount != 1 {
-		t.Errorf("Expected 1 call (no retry for 400), got %d", callCount)
+			mu.Lock()
+			final := callCount
+			mu.Unlock()
+			if final != tt.expectedCalls {
+				t.Errorf("Expected %d calls, got %d", tt.expectedCalls, final)
+			}
+		})
 	}
 }
 
@@ -1209,20 +1186,46 @@ func TestRefreshTokenWithRetries_context_cancellation(t *testing.T) {
 	}
 }
 
+// countingTransport is an http.RoundTripper that counts calls and always
+// returns the configured error. Used to verify retry attempt counts for
+// transport-level failures like connection refused.
+type countingTransport struct {
+	mu    sync.Mutex
+	calls int
+	err   error
+}
+
+func (ct *countingTransport) RoundTrip(*http.Request) (*http.Response, error) {
+	ct.mu.Lock()
+	ct.calls++
+	ct.mu.Unlock()
+	return nil, ct.err
+}
+
 func TestRefreshTokenWithRetries_connection_refused(t *testing.T) {
-	// Use a port that should refuse connections
-	retry := RetryOptions{MaxRetries: 1, BaseDelay: 0.01, MaxDelay: 0.02, Jitter: JitterNone}
+	transport := &countingTransport{
+		err: &net.OpError{Op: "dial", Net: "tcp", Err: fmt.Errorf("connection refused")},
+	}
+
+	retry := RetryOptions{MaxRetries: 2, BaseDelay: 0.01, MaxDelay: 0.02, Jitter: JitterNone}
 	credentials := NewOAuth2ClientCredentials("client", "secret", "http://127.0.0.1:1/token", retry)
 
-	_, err := credentials.refreshTokenWithRetries(context.Background(), &http.Client{Timeout: time.Second})
+	_, err := credentials.refreshTokenWithRetries(context.Background(), &http.Client{Transport: transport})
 	if err == nil {
 		t.Fatal("Expected error for connection refused")
 	}
 
-	// Should have retried (connection error is retryable)
 	var netErr net.Error
 	if !errors.As(err, &netErr) {
 		t.Errorf("Expected net.Error, got %T: %v", err, err)
+	}
+
+	// 1 initial + 2 retries = 3 total attempts
+	transport.mu.Lock()
+	attempts := transport.calls
+	transport.mu.Unlock()
+	if attempts != 3 {
+		t.Errorf("Expected 3 attempts (1 initial + 2 retries), got %d", attempts)
 	}
 }
 
@@ -1444,48 +1447,5 @@ func TestRefreshTokenWithRetries_retry_on_eof(t *testing.T) {
 	mu.Unlock()
 	if final != 2 {
 		t.Errorf("Expected 2 calls (1 EOF + 1 success), got %d", final)
-	}
-}
-
-func TestRefreshTokenWithRetries_retry_on_502(t *testing.T) {
-	callCount := 0
-	var mu sync.Mutex
-	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		mu.Lock()
-		callCount++
-		current := callCount
-		mu.Unlock()
-
-		if current == 1 {
-			http.Error(w, "Bad Gateway", http.StatusBadGateway)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		if err := json.NewEncoder(w).Encode(map[string]interface{}{
-			"access_token": "after-502",
-			"token_type":   "Bearer",
-			"expires_in":   3600,
-		}); err != nil {
-			t.Errorf("Failed to encode test response: %v", err)
-		}
-	}))
-	defer server.Close()
-
-	retry := RetryOptions{MaxRetries: 3, BaseDelay: 0.01, MaxDelay: 0.02, Jitter: JitterNone}
-	credentials := NewOAuth2ClientCredentials("client", "secret", server.URL, retry)
-	resp, err := credentials.refreshTokenWithRetries(context.Background(), http.DefaultClient)
-
-	if err != nil {
-		t.Fatalf("Unexpected error: %v", err)
-	}
-	if resp.AccessToken != "after-502" {
-		t.Errorf("Expected 'after-502', got %q", resp.AccessToken)
-	}
-
-	mu.Lock()
-	final := callCount
-	mu.Unlock()
-	if final != 2 {
-		t.Errorf("Expected 2 calls, got %d", final)
 	}
 }
