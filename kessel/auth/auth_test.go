@@ -1405,7 +1405,9 @@ func TestRefreshTokenWithRetries_retry_on_eof(t *testing.T) {
 				t.Errorf("Hijack failed: %v", err)
 				return
 			}
-			conn.Close()
+			if closeErr := conn.Close(); closeErr != nil {
+				t.Errorf("conn.Close failed: %v", closeErr)
+			}
 			return
 		}
 
