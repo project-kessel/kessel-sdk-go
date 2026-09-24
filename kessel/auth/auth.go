@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"errors"
+	"io"
 	"math"
 	"math/rand/v2"
 	"net"
@@ -277,9 +278,10 @@ func (o *OAuth2ClientCredentials) retryDelay(retryIndex int) time.Duration {
 }
 
 // isRetryableError returns true for transient errors that should be retried:
-// network/connection errors, timeouts, HTTP 429, and HTTP 5xx responses.
-// Permanent errors wrapped in *url.Error (TLS failures, unsupported schemes,
-// context cancellation) are not retried.
+// network/connection errors, timeouts, EOF (connection closed before response
+// headers), HTTP 429, and HTTP 5xx responses. Permanent errors wrapped in
+// *url.Error (TLS failures, unsupported schemes, context cancellation) are
+// not retried.
 func isRetryableError(err error, httpStatus int) bool {
 	// *url.Error wraps all http.Client transport errors and satisfies
 	// net.Error, so inspect the underlying cause first to avoid retrying
@@ -287,6 +289,13 @@ func isRetryableError(err error, httpStatus int) bool {
 	var urlErr *url.Error
 	if errors.As(err, &urlErr) {
 		if urlErr.Timeout() {
+			return true
+		}
+		// EOF and unexpected EOF indicate the server closed the connection
+		// before sending response headers — a transient transport failure
+		// that is safe to retry. This matches the retry behavior of the
+		// Python and Ruby SDKs.
+		if errors.Is(urlErr.Err, io.EOF) || errors.Is(urlErr.Err, io.ErrUnexpectedEOF) {
 			return true
 		}
 		var inner net.Error

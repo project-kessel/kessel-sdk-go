@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -882,6 +883,36 @@ func TestIsRetryableError(t *testing.T) {
 			httpStatus: 0,
 			expected:   true,
 		},
+		{
+			name: "url error wrapping eof is retryable",
+			err: &url.Error{
+				Op:  "Post",
+				URL: "https://example.com/token",
+				Err: io.EOF,
+			},
+			httpStatus: 0,
+			expected:   true,
+		},
+		{
+			name: "url error wrapping unexpected eof is retryable",
+			err: &url.Error{
+				Op:  "Post",
+				URL: "https://example.com/token",
+				Err: io.ErrUnexpectedEOF,
+			},
+			httpStatus: 0,
+			expected:   true,
+		},
+		{
+			name: "url error wrapping wrapped eof is retryable",
+			err: &url.Error{
+				Op:  "Post",
+				URL: "https://example.com/token",
+				Err: fmt.Errorf("read body: %w", io.EOF),
+			},
+			httpStatus: 0,
+			expected:   true,
+		},
 	}
 
 	for _, tt := range tests {
@@ -1348,6 +1379,69 @@ func TestRefreshTokenWithRetries_preserves_nil_transport(t *testing.T) {
 	}
 	if resp.AccessToken != "nil-transport-ok" {
 		t.Errorf("Expected 'nil-transport-ok', got %q", resp.AccessToken)
+	}
+}
+
+func TestRefreshTokenWithRetries_retry_on_eof(t *testing.T) {
+	callCount := 0
+	var mu sync.Mutex
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		mu.Lock()
+		callCount++
+		current := callCount
+		mu.Unlock()
+
+		if current == 1 {
+			// Hijack the connection and close it immediately without
+			// sending response headers, causing the client to receive EOF.
+			hijacker, ok := w.(http.Hijacker)
+			if !ok {
+				t.Error("ResponseWriter does not support hijacking")
+				return
+			}
+			conn, _, err := hijacker.Hijack()
+			if err != nil {
+				t.Errorf("Hijack failed: %v", err)
+				return
+			}
+			conn.Close()
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(map[string]interface{}{
+			"access_token": "after-eof",
+			"token_type":   "Bearer",
+			"expires_in":   3600,
+		}); err != nil {
+			t.Errorf("Failed to encode test response: %v", err)
+		}
+	}))
+	defer server.Close()
+
+	retry := RetryOptions{MaxRetries: 3, BaseDelay: 0.01, MaxDelay: 0.02, Jitter: JitterNone}
+	credentials := NewOAuth2ClientCredentials("client", "secret", server.URL, retry)
+
+	// Disable keep-alives so the second request opens a fresh connection
+	// instead of reusing the closed one.
+	httpClient := &http.Client{
+		Transport: &http.Transport{DisableKeepAlives: true},
+	}
+	resp, err := credentials.refreshTokenWithRetries(context.Background(), httpClient)
+
+	if err != nil {
+		t.Fatalf("Expected successful token after EOF retry, got: %v", err)
+	}
+	if resp.AccessToken != "after-eof" {
+		t.Errorf("Expected 'after-eof', got %q", resp.AccessToken)
+	}
+
+	mu.Lock()
+	final := callCount
+	mu.Unlock()
+	if final != 2 {
+		t.Errorf("Expected 2 calls (1 EOF + 1 success), got %d", final)
 	}
 }
 
