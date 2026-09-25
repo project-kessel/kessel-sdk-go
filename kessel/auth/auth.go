@@ -35,34 +35,70 @@ type RefreshTokenResponse struct {
 	ExpiresAt   time.Time
 }
 
-// RetryOptions configures bounded exponential backoff with jitter for
-// OIDC token endpoint requests.
-//
-// When passing RetryOptions to [NewOAuth2ClientCredentials], always set
-// MaxRetries explicitly. The zero value (0) disables retries, so passing
-// RetryOptions with only BaseDelay, MaxDelay, or Jitter set will silently
-// disable retries.
-type RetryOptions struct {
-	// Maximum number of retries after the initial request. 0 disables retries.
-	// Always set this field explicitly when passing RetryOptions: the zero
-	// value disables retries even if other fields are customized.
-	MaxRetries int
-	// Initial backoff delay in seconds.
-	BaseDelay float64
-	// Maximum backoff delay cap in seconds.
-	MaxDelay float64
-	// Jitter strategy: JitterFull (default) or JitterNone.
-	Jitter string
+// retryConfig holds the resolved retry configuration for OIDC token
+// endpoint requests. Construct via [RetryOption] functional options
+// passed to [NewOAuth2ClientCredentials].
+type retryConfig struct {
+	maxRetries int
+	baseDelay  float64
+	maxDelay   float64
+	jitter     string
 }
 
-// DefaultRetryOptions returns the default retry configuration:
+// defaultRetryConfig returns the default retry configuration:
 // 3 retries, 0.5s base delay, 2.0s max delay, full jitter.
-func DefaultRetryOptions() RetryOptions {
-	return RetryOptions{
-		MaxRetries: 3,
-		BaseDelay:  0.5,
-		MaxDelay:   2.0,
-		Jitter:     JitterFull,
+func defaultRetryConfig() retryConfig {
+	return retryConfig{
+		maxRetries: 3,
+		baseDelay:  0.5,
+		maxDelay:   2.0,
+		jitter:     JitterFull,
+	}
+}
+
+// RetryOption configures retry behavior for OIDC token endpoint requests.
+// Pass one or more RetryOption values to [NewOAuth2ClientCredentials] to
+// customize retry behavior. Omitting all options uses the defaults:
+// 3 retries, 0.5s base delay, 2.0s max delay, full jitter.
+type RetryOption func(*retryConfig)
+
+// WithMaxRetries sets the maximum number of retries after the initial
+// request. Set to 0 to disable retries. When omitted, the default (3)
+// is used — unlike a struct field, omitting this option never silently
+// disables retries.
+func WithMaxRetries(n int) RetryOption {
+	return func(c *retryConfig) {
+		c.maxRetries = n
+	}
+}
+
+// WithBaseDelay sets the initial exponential backoff delay in seconds
+// (default: 0.5).
+func WithBaseDelay(seconds float64) RetryOption {
+	return func(c *retryConfig) {
+		if seconds > 0 {
+			c.baseDelay = seconds
+		}
+	}
+}
+
+// WithMaxDelay sets the maximum backoff delay cap in seconds
+// (default: 2.0).
+func WithMaxDelay(seconds float64) RetryOption {
+	return func(c *retryConfig) {
+		if seconds > 0 {
+			c.maxDelay = seconds
+		}
+	}
+}
+
+// WithJitter sets the jitter strategy: [JitterFull] (default) or
+// [JitterNone].
+func WithJitter(mode string) RetryOption {
+	return func(c *retryConfig) {
+		if mode != "" {
+			c.jitter = mode
+		}
 	}
 }
 
@@ -73,7 +109,7 @@ type OAuth2ClientCredentials struct {
 	cachedToken   RefreshTokenResponse
 	tokenMutex    sync.RWMutex
 	generation    uint64
-	retry         RetryOptions
+	retry         retryConfig
 }
 
 type FetchOIDCDiscoveryOptions struct {
@@ -119,24 +155,15 @@ func (t *statusCapturingTransport) RoundTrip(req *http.Request) (*http.Response,
 }
 
 // NewOAuth2ClientCredentials creates an OAuth2 client-credentials provider.
-// If no RetryOptions are passed, DefaultRetryOptions() is used (3 retries,
-// exponential backoff with full jitter). When passing RetryOptions, always
-// set MaxRetries explicitly — a zero-value MaxRetries disables retries even
-// if only BaseDelay, MaxDelay, or Jitter are customized.
-func NewOAuth2ClientCredentials(clientId string, clientSecret string, tokenEndpoint string, opts ...RetryOptions) OAuth2ClientCredentials {
-	retry := DefaultRetryOptions()
-	if len(opts) > 0 {
-		o := opts[0]
-		retry.MaxRetries = o.MaxRetries
-		if o.BaseDelay > 0 {
-			retry.BaseDelay = o.BaseDelay
-		}
-		if o.MaxDelay > 0 {
-			retry.MaxDelay = o.MaxDelay
-		}
-		if o.Jitter != "" {
-			retry.Jitter = o.Jitter
-		}
+// If no [RetryOption] values are passed, the default retry policy is used
+// (3 retries, exponential backoff with full jitter). Partial customization
+// retains defaults for unset fields — for example, passing only
+// [WithJitter](JitterNone) keeps the default retry count of 3. Pass
+// [WithMaxRetries](0) to disable retries entirely.
+func NewOAuth2ClientCredentials(clientId string, clientSecret string, tokenEndpoint string, opts ...RetryOption) OAuth2ClientCredentials {
+	retry := defaultRetryConfig()
+	for _, opt := range opts {
+		opt(&retry)
 	}
 	return OAuth2ClientCredentials{
 		clientId:      clientId,
@@ -199,7 +226,7 @@ func (o *OAuth2ClientCredentials) GetToken(ctx context.Context, options GetToken
 }
 
 func (o *OAuth2ClientCredentials) refreshTokenWithRetries(ctx context.Context, httpClient *http.Client) (RefreshTokenResponse, error) {
-	maxRetries := o.retry.MaxRetries
+	maxRetries := o.retry.maxRetries
 	if maxRetries <= 0 {
 		return o.refreshToken(ctx, httpClient)
 	}
@@ -282,8 +309,8 @@ func (o *OAuth2ClientCredentials) isTokenValid() bool {
 // bounded exponential backoff. With full jitter, the delay is a random
 // value in [0, cap). With no jitter, the exact cap is used.
 func (o *OAuth2ClientCredentials) retryDelay(retryIndex int) time.Duration {
-	computed := min(o.retry.MaxDelay, o.retry.BaseDelay*math.Pow(2, float64(retryIndex)))
-	if o.retry.Jitter == JitterNone {
+	computed := min(o.retry.maxDelay, o.retry.baseDelay*math.Pow(2, float64(retryIndex)))
+	if o.retry.jitter == JitterNone {
 		return time.Duration(computed * float64(time.Second))
 	}
 	return time.Duration(rand.Float64() * computed * float64(time.Second))

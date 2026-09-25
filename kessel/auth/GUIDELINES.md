@@ -16,7 +16,7 @@ This package implements OAuth2 client-credentials authentication for the Kessel 
 ## Construction Rules
 
 - `OAuth2ClientCredentials` fields (`clientId`, `clientSecret`, `tokenEndpoint`) are **unexported**. Always construct via `NewOAuth2ClientCredentials(clientId, clientSecret, tokenEndpoint)` or `NewOAuth2ClientCredentials(clientId, clientSecret, tokenEndpoint, retryOpts)`. Struct literals will not compile outside this package.
-- `NewOAuth2ClientCredentials` accepts an optional variadic `RetryOptions` parameter. If omitted, `DefaultRetryOptions()` is used (3 retries, 0.5s base delay, 2.0s max delay, full jitter). Pass `RetryOptions{MaxRetries: 0}` to disable retries.
+- `NewOAuth2ClientCredentials` accepts variadic `RetryOption` functional options. If omitted, the default retry policy is used (3 retries, 0.5s base delay, 2.0s max delay, full jitter). Partial options retain defaults for unset fields — for example, `WithJitter(JitterNone)` alone keeps the default 3 retries. Pass `WithMaxRetries(0)` to disable retries.
 - `NewOAuth2ClientCredentials` returns a **value**, not a pointer. The caller must take its address (`&creds`) before passing it to any consumer. All downstream consumers (`OAuth2AuthRequest`, `OAuth2CallCredentials`, `OAuth2ClientAuthenticated`) accept `*OAuth2ClientCredentials`.
 - `oauth2Auth` is unexported. Callers obtain an `AuthRequest` via `OAuth2AuthRequest(creds, options)` -- they never see the concrete type.
 
@@ -51,14 +51,16 @@ type AuthRequest interface {
 
 ## Token Endpoint Retry Logic
 
-`OAuth2ClientCredentials` performs bounded exponential backoff with jitter on OIDC token endpoint requests. Retries are configured via `RetryOptions`:
+`OAuth2ClientCredentials` performs bounded exponential backoff with jitter on OIDC token endpoint requests. Retries are configured via `RetryOption` functional options passed to `NewOAuth2ClientCredentials`:
 
-| Field | Type | Default | Description |
-|-------|------|---------|-------------|
-| `MaxRetries` | `int` | `3` | Max retries after initial request. `0` disables retries. Always set explicitly when passing `RetryOptions` — the zero value disables retries even if only delays or jitter are customized. |
-| `BaseDelay` | `float64` | `0.5` | Initial backoff delay in seconds. |
-| `MaxDelay` | `float64` | `2.0` | Max backoff delay cap in seconds. |
-| `Jitter` | `string` | `JitterFull` | `JitterFull` (random in `[0, delay)`) or `JitterNone` (exact delay). |
+| Option | Default | Description |
+|--------|---------|-------------|
+| `WithMaxRetries(n)` | `3` | Max retries after initial request. `0` disables retries. Omitting this option retains the default — unlike a struct field, the zero value is never applied implicitly. |
+| `WithBaseDelay(s)` | `0.5` | Initial backoff delay in seconds. |
+| `WithMaxDelay(s)` | `2.0` | Max backoff delay cap in seconds. |
+| `WithJitter(mode)` | `JitterFull` | `JitterFull` (random in `[0, delay)`) or `JitterNone` (exact delay). |
+
+The underlying `retryConfig` struct is unexported. All configuration is done through `RetryOption` functional options, following the same pattern as `CompatibilityClientOption` in `kessel/config/`.
 
 **Retryable conditions:** Transient network errors (`net.Error` inside `*url.Error`, or bare `net.Error`), timeouts, HTTP 429, HTTP 5xx. Permanent errors wrapped in `*url.Error` (TLS certificate failures, unsupported protocol schemes, `context.Canceled`) are **not** retried. All other errors (400, 401, 403, etc.) are returned immediately.
 

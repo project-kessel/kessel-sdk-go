@@ -36,88 +36,109 @@ func TestMakeOAuth2ClientCredentials(t *testing.T) {
 	}
 }
 
-func TestMakeOAuth2ClientCredentials_default_retry(t *testing.T) {
-	credentials := NewOAuth2ClientCredentials("id", "secret", "https://example.com/token")
+func TestNewOAuth2ClientCredentials_retry_option_behavior(t *testing.T) {
+	tests := []struct {
+		name          string
+		opts          []RetryOption
+		failCount     int
+		expectSuccess bool
+		expectedCalls int
+	}{
+		{
+			name:          "no options uses default 3 retries",
+			opts:          nil,
+			failCount:     3,
+			expectSuccess: true,
+			expectedCalls: 4, // 1 initial + 3 retries
+		},
+		{
+			name:          "WithMaxRetries(0) disables retries",
+			opts:          []RetryOption{WithMaxRetries(0)},
+			failCount:     1,
+			expectSuccess: false,
+			expectedCalls: 1,
+		},
+		{
+			name:          "WithJitter only retains default retry count",
+			opts:          []RetryOption{WithJitter(JitterNone)},
+			failCount:     2,
+			expectSuccess: true,
+			expectedCalls: 3, // 1 initial + 2 retries (default 3 retries available)
+		},
+		{
+			name:          "WithBaseDelay only retains default retry count",
+			opts:          []RetryOption{WithBaseDelay(0.01)},
+			failCount:     3,
+			expectSuccess: true,
+			expectedCalls: 4,
+		},
+		{
+			name:          "WithMaxRetries overrides default",
+			opts:          []RetryOption{WithMaxRetries(5)},
+			failCount:     5,
+			expectSuccess: true,
+			expectedCalls: 6, // 1 initial + 5 retries
+		},
+		{
+			name:          "combined partial options retain unset defaults",
+			opts:          []RetryOption{WithJitter(JitterNone), WithBaseDelay(0.01)},
+			failCount:     3,
+			expectSuccess: true,
+			expectedCalls: 4, // default 3 retries retained
+		},
+	}
 
-	if credentials.retry.MaxRetries != 3 {
-		t.Errorf("Expected default MaxRetries 3, got %d", credentials.retry.MaxRetries)
-	}
-	if credentials.retry.BaseDelay != 0.5 {
-		t.Errorf("Expected default BaseDelay 0.5, got %f", credentials.retry.BaseDelay)
-	}
-	if credentials.retry.MaxDelay != 2.0 {
-		t.Errorf("Expected default MaxDelay 2.0, got %f", credentials.retry.MaxDelay)
-	}
-	if credentials.retry.Jitter != JitterFull {
-		t.Errorf("Expected default Jitter %q, got %q", JitterFull, credentials.retry.Jitter)
-	}
-}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			callCount := 0
+			var mu sync.Mutex
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				mu.Lock()
+				callCount++
+				current := callCount
+				mu.Unlock()
 
-func TestMakeOAuth2ClientCredentials_custom_retry(t *testing.T) {
-	retry := RetryOptions{
-		MaxRetries: 5,
-		BaseDelay:  1.0,
-		MaxDelay:   10.0,
-		Jitter:     JitterNone,
-	}
-	credentials := NewOAuth2ClientCredentials("id", "secret", "https://example.com/token", retry)
+				if current <= tt.failCount {
+					http.Error(w, "Service Unavailable", http.StatusServiceUnavailable)
+					return
+				}
+				w.Header().Set("Content-Type", "application/json")
+				if err := json.NewEncoder(w).Encode(map[string]interface{}{
+					"access_token": "ok",
+					"token_type":   "Bearer",
+					"expires_in":   3600,
+				}); err != nil {
+					t.Errorf("Failed to encode test response: %v", err)
+				}
+			}))
+			defer server.Close()
 
-	if credentials.retry.MaxRetries != 5 {
-		t.Errorf("Expected MaxRetries 5, got %d", credentials.retry.MaxRetries)
-	}
-	if credentials.retry.BaseDelay != 1.0 {
-		t.Errorf("Expected BaseDelay 1.0, got %f", credentials.retry.BaseDelay)
-	}
-	if credentials.retry.MaxDelay != 10.0 {
-		t.Errorf("Expected MaxDelay 10.0, got %f", credentials.retry.MaxDelay)
-	}
-	if credentials.retry.Jitter != JitterNone {
-		t.Errorf("Expected Jitter %q, got %q", JitterNone, credentials.retry.Jitter)
-	}
-}
+			// Use fast delays to keep tests quick and deterministic
+			allOpts := append([]RetryOption{WithBaseDelay(0.01), WithMaxDelay(0.02)}, tt.opts...)
+			credentials := NewOAuth2ClientCredentials("client", "secret", server.URL, allOpts...)
 
-func TestMakeOAuth2ClientCredentials_disabled_retry(t *testing.T) {
-	retry := RetryOptions{MaxRetries: 0}
-	credentials := NewOAuth2ClientCredentials("id", "secret", "https://example.com/token", retry)
+			resp, err := credentials.GetToken(context.Background(), GetTokenOptions{})
 
-	if credentials.retry.MaxRetries != 0 {
-		t.Errorf("Expected MaxRetries 0, got %d", credentials.retry.MaxRetries)
-	}
-}
+			if tt.expectSuccess {
+				if err != nil {
+					t.Fatalf("Expected success, got error: %v", err)
+				}
+				if resp.AccessToken != "ok" {
+					t.Errorf("Expected token %q, got %q", "ok", resp.AccessToken)
+				}
+			} else {
+				if err == nil {
+					t.Fatal("Expected error but got none")
+				}
+			}
 
-func TestMakeOAuth2ClientCredentials_partial_retry(t *testing.T) {
-	// Only MaxRetries set — BaseDelay, MaxDelay, Jitter should keep defaults
-	retry := RetryOptions{MaxRetries: 5}
-	credentials := NewOAuth2ClientCredentials("id", "secret", "https://example.com/token", retry)
-
-	if credentials.retry.MaxRetries != 5 {
-		t.Errorf("Expected MaxRetries 5, got %d", credentials.retry.MaxRetries)
-	}
-	if credentials.retry.BaseDelay != 0.5 {
-		t.Errorf("Expected default BaseDelay 0.5, got %f", credentials.retry.BaseDelay)
-	}
-	if credentials.retry.MaxDelay != 2.0 {
-		t.Errorf("Expected default MaxDelay 2.0, got %f", credentials.retry.MaxDelay)
-	}
-	if credentials.retry.Jitter != JitterFull {
-		t.Errorf("Expected default Jitter %q, got %q", JitterFull, credentials.retry.Jitter)
-	}
-}
-
-func TestDefaultRetryOptions(t *testing.T) {
-	opts := DefaultRetryOptions()
-
-	if opts.MaxRetries != 3 {
-		t.Errorf("Expected MaxRetries 3, got %d", opts.MaxRetries)
-	}
-	if opts.BaseDelay != 0.5 {
-		t.Errorf("Expected BaseDelay 0.5, got %f", opts.BaseDelay)
-	}
-	if opts.MaxDelay != 2.0 {
-		t.Errorf("Expected MaxDelay 2.0, got %f", opts.MaxDelay)
-	}
-	if opts.Jitter != JitterFull {
-		t.Errorf("Expected Jitter %q, got %q", JitterFull, opts.Jitter)
+			mu.Lock()
+			final := callCount
+			mu.Unlock()
+			if final != tt.expectedCalls {
+				t.Errorf("Expected %d token requests, got %d", tt.expectedCalls, final)
+			}
+		})
 	}
 }
 
@@ -259,7 +280,7 @@ func TestOAuth2ClientCredentials_GetToken(t *testing.T) {
 			}
 
 			// Disable retries so existing tests behave identically
-			credentials := NewOAuth2ClientCredentials("test-client", "test-secret", tokenEndpoint, RetryOptions{MaxRetries: 0})
+			credentials := NewOAuth2ClientCredentials("test-client", "test-secret", tokenEndpoint, WithMaxRetries(0))
 
 			// Setup cached token if provided
 			if tt.setupToken != nil {
@@ -751,13 +772,8 @@ func TestRetryDelay_full_jitter(t *testing.T) {
 }
 
 func TestRetryDelay_no_jitter(t *testing.T) {
-	retry := RetryOptions{
-		MaxRetries: 3,
-		BaseDelay:  0.5,
-		MaxDelay:   2.0,
-		Jitter:     JitterNone,
-	}
-	credentials := NewOAuth2ClientCredentials("id", "secret", "https://example.com/token", retry)
+	credentials := NewOAuth2ClientCredentials("id", "secret", "https://example.com/token",
+		WithMaxRetries(3), WithBaseDelay(0.5), WithMaxDelay(2.0), WithJitter(JitterNone))
 
 	tests := []struct {
 		name       string
@@ -1067,8 +1083,8 @@ func TestRefreshTokenWithRetries_http_status_codes(t *testing.T) {
 			}))
 			defer server.Close()
 
-			retry := RetryOptions{MaxRetries: tt.maxRetries, BaseDelay: 0.01, MaxDelay: 0.02, Jitter: JitterNone}
-			credentials := NewOAuth2ClientCredentials("client", "secret", server.URL, retry)
+			credentials := NewOAuth2ClientCredentials("client", "secret", server.URL,
+				WithMaxRetries(tt.maxRetries), WithBaseDelay(0.01), WithMaxDelay(0.02), WithJitter(JitterNone))
 			resp, err := credentials.refreshTokenWithRetries(context.Background(), http.DefaultClient)
 
 			if tt.expectSuccess {
@@ -1105,8 +1121,8 @@ func TestRefreshTokenWithRetries_max_retries_exceeded(t *testing.T) {
 	}))
 	defer server.Close()
 
-	retry := RetryOptions{MaxRetries: 2, BaseDelay: 0.01, MaxDelay: 0.02, Jitter: JitterNone}
-	credentials := NewOAuth2ClientCredentials("client", "secret", server.URL, retry)
+	credentials := NewOAuth2ClientCredentials("client", "secret", server.URL,
+		WithMaxRetries(2), WithBaseDelay(0.01), WithMaxDelay(0.02), WithJitter(JitterNone))
 	_, err := credentials.refreshTokenWithRetries(context.Background(), http.DefaultClient)
 
 	if err == nil {
@@ -1130,8 +1146,7 @@ func TestRefreshTokenWithRetries_disabled(t *testing.T) {
 	}))
 	defer server.Close()
 
-	retry := RetryOptions{MaxRetries: 0}
-	credentials := NewOAuth2ClientCredentials("client", "secret", server.URL, retry)
+	credentials := NewOAuth2ClientCredentials("client", "secret", server.URL, WithMaxRetries(0))
 	_, err := credentials.refreshTokenWithRetries(context.Background(), http.DefaultClient)
 
 	if err == nil {
@@ -1156,8 +1171,8 @@ func TestRefreshTokenWithRetries_context_cancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	// Use a long delay so context cancellation fires during the wait
-	retry := RetryOptions{MaxRetries: 5, BaseDelay: 10.0, MaxDelay: 10.0, Jitter: JitterNone}
-	credentials := NewOAuth2ClientCredentials("client", "secret", server.URL, retry)
+	credentials := NewOAuth2ClientCredentials("client", "secret", server.URL,
+		WithMaxRetries(5), WithBaseDelay(10.0), WithMaxDelay(10.0), WithJitter(JitterNone))
 
 	done := make(chan error, 1)
 	go func() {
@@ -1207,8 +1222,8 @@ func TestRefreshTokenWithRetries_connection_refused(t *testing.T) {
 		err: &net.OpError{Op: "dial", Net: "tcp", Err: fmt.Errorf("connection refused")},
 	}
 
-	retry := RetryOptions{MaxRetries: 2, BaseDelay: 0.01, MaxDelay: 0.02, Jitter: JitterNone}
-	credentials := NewOAuth2ClientCredentials("client", "secret", "http://127.0.0.1:1/token", retry)
+	credentials := NewOAuth2ClientCredentials("client", "secret", "http://127.0.0.1:1/token",
+		WithMaxRetries(2), WithBaseDelay(0.01), WithMaxDelay(0.02), WithJitter(JitterNone))
 
 	_, err := credentials.refreshTokenWithRetries(context.Background(), &http.Client{Transport: transport})
 	if err == nil {
@@ -1253,8 +1268,8 @@ func TestGetToken_retries_500_then_succeeds(t *testing.T) {
 	}))
 	defer server.Close()
 
-	retry := RetryOptions{MaxRetries: 3, BaseDelay: 0.01, MaxDelay: 0.02, Jitter: JitterNone}
-	credentials := NewOAuth2ClientCredentials("client", "secret", server.URL, retry)
+	credentials := NewOAuth2ClientCredentials("client", "secret", server.URL,
+		WithMaxRetries(3), WithBaseDelay(0.01), WithMaxDelay(0.02), WithJitter(JitterNone))
 
 	resp, err := credentials.GetToken(context.Background(), GetTokenOptions{})
 	if err != nil {
@@ -1300,8 +1315,8 @@ func TestGetToken_concurrent_with_retries(t *testing.T) {
 	}))
 	defer server.Close()
 
-	retry := RetryOptions{MaxRetries: 3, BaseDelay: 0.01, MaxDelay: 0.02, Jitter: JitterNone}
-	credentials := NewOAuth2ClientCredentials("client", "secret", server.URL, retry)
+	credentials := NewOAuth2ClientCredentials("client", "secret", server.URL,
+		WithMaxRetries(3), WithBaseDelay(0.01), WithMaxDelay(0.02), WithJitter(JitterNone))
 
 	const numGoroutines = 10
 	results := make(chan RefreshTokenResponse, numGoroutines)
@@ -1425,8 +1440,8 @@ func TestRefreshTokenWithRetries_retry_on_eof(t *testing.T) {
 	}))
 	defer server.Close()
 
-	retry := RetryOptions{MaxRetries: 3, BaseDelay: 0.01, MaxDelay: 0.02, Jitter: JitterNone}
-	credentials := NewOAuth2ClientCredentials("client", "secret", server.URL, retry)
+	credentials := NewOAuth2ClientCredentials("client", "secret", server.URL,
+		WithMaxRetries(3), WithBaseDelay(0.01), WithMaxDelay(0.02), WithJitter(JitterNone))
 
 	// Disable keep-alives so the second request opens a fresh connection
 	// instead of reusing the closed one.
