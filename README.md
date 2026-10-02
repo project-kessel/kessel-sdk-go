@@ -93,6 +93,23 @@ See the [examples](#examples) section for complete working code.
 
 Pass `nil` for `tlsCreds` to use the default TLS configuration.
 
+### gRPC keepalive
+
+Every client built with `ClientBuilder.Build()` uses a **45-second keepalive interval**, a **10-second acknowledgment timeout**, and permits keepalive pings when no RPC is active. No keepalive call is needed for these defaults. The `v1beta2` builder exposes typed functional options for overrides; each option changes only its specified value, so omitted values retain their current setting and an explicit `false` is honored:
+
+```go
+inventoryClient, conn, err := v1beta2.NewClientBuilder(endpoint).
+	Keepalive(
+		v1beta2.WithKeepaliveInterval(60*time.Second),
+		v1beta2.WithKeepaliveTimeout(15*time.Second),
+		v1beta2.WithKeepalivePermitWithoutCalls(false),
+	).
+	Insecure().
+	Build()
+```
+
+Keepalive durations must be positive; `Build()` returns an error for zero or negative values. grpc-go clamps configured intervals below 10 seconds to 10 seconds. Keepalive is transport-level ping behavior, not an application health check, retry mechanism, or guarantee against server or load-balancer idle timeouts. Servers and gateways must permit the configured ping cadence, including pings while idle, or may close the connection with a `GOAWAY` carrying `too_many_pings`. See the configuration-only [keepalive example](./examples/grpc/keepalive.go); it builds clients with both defaults and overrides without making an RPC.
+
 ## Error Handling
 
 The SDK uses standard gRPC status codes:
@@ -160,8 +177,8 @@ kessel/
     v1beta2/               # Generated: unified API + hand-written client_builder.go
   rbac/v2/                 # Hand-written: REST workspace client + v1beta2 utility constructors
 examples/
-  grpc/                    # gRPC client examples (6 standalone binaries)
-  rbac/                    # RBAC workspace examples (2 standalone binaries)
+  grpc/                    # gRPC client examples
+  rbac/                    # RBAC workspace examples
   console/                 # Console identity examples
 .github/workflows/         # CI: lint, build-test, buf-generate
 ```
@@ -236,6 +253,7 @@ All examples are standalone `package main` binaries. Copy the `.env.sample` file
 | Report resource | [`examples/grpc/report_resource.go`](./examples/grpc/report_resource.go) | Report a resource with metadata, common, and reporter representations |
 | Delete resource | [`examples/grpc/delete_resource.go`](./examples/grpc/delete_resource.go) | Delete a resource by reference |
 | Bulk check | [`examples/grpc/check_bulk.go`](./examples/grpc/check_bulk.go) | Check multiple permission tuples in a single `CheckBulk` call |
+| Keepalive | [`examples/grpc/keepalive.go`](./examples/grpc/keepalive.go) | Build clients with default and overridden gRPC keepalive settings; no RPC is sent |
 
 ### RBAC (REST + gRPC)
 
@@ -257,6 +275,7 @@ make build
 ./bin/report-resource-example
 ./bin/delete-resource-example
 ./bin/check_bulk_example
+./bin/keepalive-example
 ./bin/fetch_workspace
 ./bin/list_workspaces
 ```
@@ -289,7 +308,6 @@ This project follows [Semantic Versioning 2.0.0](https://semver.org/). Version n
 
 - Write access to the GitHub repository
 - Ensure quality checks are passing
-- Review and update CHANGELOG or release notes as needed
 - Go 1.25 or higher
 - [buf](https://github.com/bufbuild/buf) for protobuf/gRPC code generation:
   ```bash
@@ -359,7 +377,6 @@ Or manually:
 - Go to the [GitHub Releases page](https://github.com/project-kessel/kessel-sdk-go/releases)
 - Click "Create a new release"
 - Select the tag you just created
-- Add release notes describing the changes
 - Publish the release
 
 After the tag is published, users can install that version with:

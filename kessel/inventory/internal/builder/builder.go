@@ -9,6 +9,7 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/keepalive"
 )
 
 // defaultTLSConfig returns the SDK's default TLS configuration.
@@ -24,14 +25,18 @@ type ClientBuilder[C any] struct {
 	channelCredentials credentials.TransportCredentials
 	perRPCCredentials  credentials.PerRPCCredentials
 	insecure           bool
+	keepalive          keepaliveConfig
 	newStub            func(grpc.ClientConnInterface) C
+	newClientConn      func(string, keepalive.ClientParameters, ...grpc.DialOption) (*grpc.ClientConn, error)
 }
 
 func NewClientBuilder[C any](target string, newStub func(grpc.ClientConnInterface) C) *ClientBuilder[C] {
 	return &ClientBuilder[C]{
 		target:             target,
 		channelCredentials: credentials.NewTLS(defaultTLSConfig()),
+		keepalive:          defaultKeepaliveConfig(),
 		newStub:            newStub,
+		newClientConn:      newGRPCClientConn,
 	}
 }
 
@@ -77,6 +82,9 @@ func (b *ClientBuilder[C]) Build() (C, *grpc.ClientConn, error) {
 	if b.target == "" {
 		return zero, nil, fmt.Errorf("target URI is required")
 	}
+	if err := b.keepalive.validate(); err != nil {
+		return zero, nil, err
+	}
 
 	var dialOpts []grpc.DialOption
 	// Transport security (TLS or insecure)
@@ -86,7 +94,7 @@ func (b *ClientBuilder[C]) Build() (C, *grpc.ClientConn, error) {
 		dialOpts = append(dialOpts, grpc.WithDefaultCallOptions(grpc.PerRPCCredentials(b.perRPCCredentials)))
 	}
 
-	conn, err := grpc.NewClient(b.target, dialOpts...)
+	conn, err := b.newClientConn(b.target, b.keepalive.clientParameters(), dialOpts...)
 	if err != nil {
 		return zero, nil, fmt.Errorf("failed to create gRPC client: %w", err)
 	}
