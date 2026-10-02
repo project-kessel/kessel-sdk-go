@@ -4,7 +4,7 @@ Rules for working in the generic gRPC ClientBuilder package.
 
 ## What This Package Does
 
-Single file (`builder.go`) providing `ClientBuilder[C any]` -- a generic, fluent builder that constructs a typed gRPC client stub and returns it alongside the raw `*grpc.ClientConn`. Every service version (currently only `v1beta2`) exposes its own thin wrapper via a type alias and `NewClientBuilder` function.
+`builder.go` provides `ClientBuilder[C any]` -- a generic, fluent builder that constructs a typed gRPC client stub and returns it alongside the raw `*grpc.ClientConn`. `keepalive.go` provides the keepalive configuration and typed options. Every service version (currently only `v1beta2`) exposes its own thin wrapper via a type alias and `NewClientBuilder` function.
 
 ## Generic Pattern
 
