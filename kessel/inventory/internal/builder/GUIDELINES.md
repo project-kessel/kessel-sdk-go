@@ -4,7 +4,7 @@ Rules for working in the generic gRPC ClientBuilder package.
 
 ## What This Package Does
 
-Single file (`builder.go`) providing `ClientBuilder[C any]` -- a generic, fluent builder that constructs a typed gRPC client stub and returns it alongside the raw `*grpc.ClientConn`. Every service version (currently only `v1beta2`) exposes its own thin wrapper via a type alias and `NewClientBuilder` function.
+`builder.go` provides `ClientBuilder[C any]` -- a generic, fluent builder that constructs a typed gRPC client stub and returns it alongside the raw `*grpc.ClientConn`. `keepalive.go` provides the keepalive configuration and typed options. Every service version (currently only `v1beta2`) exposes its own thin wrapper via a type alias and `NewClientBuilder` function.
 
 ## Generic Pattern
 
@@ -37,11 +37,19 @@ Do not use both adapters for the same client. `.OAuth2ClientAuthenticated()` use
 
 ## Three-Value Return from Build()
 
-`Build()` returns `(C, *grpc.ClientConn, error)` -- not just a client. The zero value of `C` is returned on error via `var zero C`. Callers must always check the error and must always `defer conn.Close()` on success. The connection is caller-owned; the builder does not track or close it.
+`Build()` returns `(C, *grpc.ClientConn, error)` -- not just a client. The zero value of `C` is returned on error via `var zero C`. Callers must always check the error and immediately defer a closure that closes the connection and logs any close error. The connection is caller-owned; the builder does not track or close it.
+
+## Client Keepalive
+
+Every client built by `ClientBuilder.Build()` has client keepalive enabled by default with a 45-second interval, a 10-second acknowledgment timeout, and `permitWithoutCalls = true`. Callers do not need to set an option to get these defaults.
+
+The `v1beta2` package exposes the builder's typed, opaque `KeepaliveOption` API through `Keepalive` and the `WithKeepaliveInterval`, `WithKeepaliveTimeout`, and `WithKeepalivePermitWithoutCalls` functions. Applying options changes only the fields they specify; later partial `Keepalive` calls preserve other configured values. An explicit `false` for `permitWithoutCalls` is a valid override. Durations must be positive; `Build()` returns a validation error when an interval or timeout is zero or negative. grpc-go clamps keepalive intervals below 10 seconds to 10 seconds.
+
+These pings are transport-level behavior, not an application health check, retry mechanism, or guarantee about server or load-balancer idle timeouts. Servers and gateways must allow the configured cadence, including pings when there are no active calls, or may close the connection with a `GOAWAY` carrying `too_many_pings`.
 
 ## No WithDialOptions Hook (By Design)
 
-The builder deliberately omits a `WithDialOptions` method. All dial options are assembled internally in `Build()`: one for transport credentials, one optional for per-RPC credentials. Custom per-call options should be passed at the call site, not injected into the connection. Do not add a `WithDialOptions` method without an explicit design decision to change this constraint.
+The builder deliberately omits a general `WithDialOptions` method. All dial options are assembled internally in `Build()`: transport credentials, optional per-RPC credentials, and the builder's supported keepalive configuration. Custom per-call options should be passed at the call site, not injected into the connection. Do not add a general `WithDialOptions` method without an explicit design decision to change this constraint.
 
 ## Per-RPC Credential Attachment
 
@@ -59,11 +67,7 @@ This private helper is called by `OAuth2ClientAuthenticated`, `Authenticated`, a
 
 Repo-wide testing rules (white-box packaging, `tt` loop variable, stdlib-only for infrastructure packages) are in [AGENTS.md -- Testing Conventions](../../../../AGENTS.md#testing-conventions).
 
-This package currently has no `_test.go` file. The builder is tested indirectly via the example binaries and integration tests. When adding tests:
-- Test that `Build()` returns an error when `target` is empty
-- Test that `Insecure()` clears previously set per-RPC credentials
-- Test auth mode overwriting (calling two modes in sequence)
-- Test `oauth2PerRPCCreds.RequireTransportSecurity()` returns correct values for both insecure and secure modes
+`builder_test.go` contains standard-library unit tests for TLS defaults, auth-mode state, target validation, and successful connection creation/cleanup. Keep tests in the same package and use the standard library. For keepalive changes, cover the defaults, partial overrides across repeated calls, explicit `false`, and `Build()` validation errors for non-positive durations; verify observable builder behavior rather than merely repeating implementation constants.
 
 ## Dependencies
 
@@ -80,4 +84,6 @@ Do not add dependencies on `kessel/config` (CompatibilityConfig) or `kessel/grpc
 - Adding `WithDialOptions` -- the closed dial option set is a deliberate design constraint.
 - Exporting `oauth2PerRPCCreds` -- it must stay internal; the exported equivalent lives in `kessel/grpc`.
 - Mixing `CompatibilityConfig` with `ClientBuilder` -- they do not interact.
+- Treating keepalive pings as health checks, retries, or a load-balancer timeout guarantee.
+- Assuming a server accepts client pings while idle or at every configured cadence; unsupported pings can trigger `GOAWAY` with `too_many_pings`.
 - Adding testify assertions -- this package uses stdlib testing only.
