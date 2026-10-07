@@ -75,6 +75,7 @@ Always use `v1beta2` for new code. It is the current active API version with the
 - **Variable naming in tests:** Loop variable is always `tt`, never `tc` or `test`. Subtest names are lowercase with spaces.
 - **Import aliasing:** Use the version as the alias when importing versioned packages: `v1beta2 "...kessel/inventory/v1beta2"`, `v2 "...kessel/rbac/v2"`. Use `kesselgrpc` to alias `kessel/grpc` (avoids conflict with `google.golang.org/grpc`).
 - **File naming:** Hand-written files use `snake_case.go`. Test files are `<name>_test.go` in the same package (white-box testing).
+- **Go documentation comments**: Add Go doc comments to all newly added exported types and functions. Add comments to non-exported functions when their logic is not obvious. When unsure whether a comment is needed or how it should be written, follow the [Go doc comments guide](https://go.dev/doc/comment).
 
 ## Linter Configuration
 
