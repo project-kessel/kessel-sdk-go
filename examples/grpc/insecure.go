@@ -1,3 +1,7 @@
+// WARNING: This example demonstrates INSECURE configuration for local development only.
+// DO NOT USE IN PRODUCTION. The .Insecure() option disables TLS certificate validation
+// and encryption, leaving traffic vulnerable to interception and tampering.
+// For production use, see authenticated.go or oauth2client_authenticated.go examples.
 package main
 
 import (
@@ -13,6 +17,7 @@ import (
 
 func insecure() {
 	ctx := context.Background()
+	// WARNING: .Insecure() disables TLS - local development only
 	inventoryClient, conn, err := v1beta2.NewClientBuilder(os.Getenv("KESSEL_ENDPOINT")).
 		Insecure().
 		Build()

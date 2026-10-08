@@ -1,3 +1,12 @@
+# TODO: Pin BSR module and remote plugins to immutable digests for supply-chain security.
+# Current references are vulnerable to upstream changes.
+# To pin:
+#   1. Run `buf mod update` to generate buf.lock with module digests
+#   2. Replace remote plugin references with digest-pinned versions:
+#      - buf.build/protocolbuffers/go:v1.36.6 → append digest from buf.build registry
+#      - buf.build/grpc/go → add version and digest from buf.build registry
+#   3. Replace module reference with: buf.build/project-kessel/inventory-api:<commit-digest>
+# See: https://buf.build/docs/bsr/authentication#pinning-dependencies
 version: v2
 inputs:
   - module: buf.build/project-kessel/inventory-api
