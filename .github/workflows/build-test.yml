@@ -23,7 +23,7 @@ jobs:
       - name: Setup Go
         uses: actions/setup-go@v7
         with:
-          go-version: '1.26.6'
+          go-version-file: 'go.mod'
           cache: true
       - name: Install dependencies
         run: go get ./...
@@ -32,4 +32,13 @@ jobs:
       - name: Test
         run: go test -v ./kessel/...
       - name: Check dependencies for known vulnerabilities
-        run: go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./kessel/...
+        shell: bash
+        run: |
+          go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./kessel/...
+          scan_dir="${RUNNER_TEMP}/govulncheck-examples"
+          mkdir -p "${scan_dir}"
+          for example in examples/*/*.go; do
+            binary="${scan_dir}/${example//\//-}"
+            go build -o "${binary}" "${example}"
+            go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 -mode=binary "${binary}"
+          done
