@@ -31,3 +31,14 @@ jobs:
         run: go build -tags release -v ./kessel/...
       - name: Test
         run: go test -v ./kessel/...
+      - name: Check dependencies for known vulnerabilities
+        shell: bash
+        run: |
+          go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 ./kessel/...
+          scan_dir="${RUNNER_TEMP}/govulncheck-examples"
+          mkdir -p "${scan_dir}"
+          for example in examples/*/*.go; do
+            binary="${scan_dir}/${example//\//-}"
+            go build -o "${binary}" "${example}"
+            go run golang.org/x/vuln/cmd/govulncheck@v1.1.4 -mode=binary "${binary}"
+          done
