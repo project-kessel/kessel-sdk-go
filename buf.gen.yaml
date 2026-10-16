@@ -1,6 +1,6 @@
 version: v2
 inputs:
-  - module: buf.build/project-kessel/inventory-api:ed02b23cf5c94b88a488efd45eb7f9e4
+  - module: buf.build/project-kessel/inventory-api
 plugins:
   - remote: buf.build/protocolbuffers/go:v1.36.12
     revision: 2
