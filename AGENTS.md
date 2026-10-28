@@ -59,7 +59,7 @@ CI runs `make lint` and `make test` (via separate workflows) on every push/PR to
 
 ## Go Version and Module Path
 
-- **Go 1.25** (specified in `go.mod`; CI reads from `go.mod` via `go-version-file`)
+- **Go 1.26.10** (specified in `go.mod`; CI reads from `go.mod` via `go-version-file`)
 - Module path: `github.com/project-kessel/kessel-sdk-go`
 - The codebase uses generics (supported since Go 1.18) and Go 1.23+ features: `iter.Seq2`, range-over-func
 
