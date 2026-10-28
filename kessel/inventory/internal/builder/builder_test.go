@@ -1,15 +1,30 @@
 package builder
 
 import (
+	"context"
 	"crypto/tls"
+	"strings"
 	"testing"
 
+	"github.com/project-kessel/kessel-sdk-go/kessel/auth"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials"
+	"google.golang.org/grpc/credentials/insecure"
 )
 
 // noopStub is a minimal stub constructor for testing the generic ClientBuilder.
 func noopStub(_ grpc.ClientConnInterface) struct{} { return struct{}{} }
+
+// insecurePerRPCCreds is a test PerRPCCredentials that does not require transport security.
+type insecurePerRPCCreds struct{}
+
+func (insecurePerRPCCreds) GetRequestMetadata(_ context.Context, _ ...string) (map[string]string, error) {
+	return map[string]string{"authorization": "Bearer test-token"}, nil
+}
+
+func (insecurePerRPCCreds) RequireTransportSecurity() bool {
+	return false
+}
 
 func TestDefaultTLSConfigMinVersion(t *testing.T) {
 	cfg := defaultTLSConfig()
@@ -165,22 +180,98 @@ func TestOAuth2ClientAuthenticatedNilClearsStalePerRPCCredentials(t *testing.T) 
 	}
 }
 
-func TestOAuth2PerRPCCredsRequireTransportSecurity(t *testing.T) {
-	tests := []struct {
-		name     string
-		insecure bool
-		expected bool
-	}{
-		{"secure mode requires transport security", false, true},
-		{"insecure mode does not require transport security", true, false},
+func TestOAuth2PerRPCCredsAlwaysRequireTransportSecurity(t *testing.T) {
+	creds := &oauth2PerRPCCreds{}
+	if !creds.RequireTransportSecurity() {
+		t.Error("expected RequireTransportSecurity() to always return true")
+	}
+}
+
+func TestSetChannelCredentialsOrDefaultDetectsInsecureTransport(t *testing.T) {
+	b := NewClientBuilder("localhost:8080", noopStub)
+	b.setChannelCredentialsOrDefault(insecure.NewCredentials())
+
+	if !b.insecure {
+		t.Error("expected insecure flag to be true when insecure credentials are provided")
 	}
 
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			creds := &oauth2PerRPCCreds{insecure: tt.insecure}
-			if got := creds.RequireTransportSecurity(); got != tt.expected {
-				t.Errorf("RequireTransportSecurity() = %v, expected %v", got, tt.expected)
-			}
-		})
+	info := b.channelCredentials.Info()
+	if info.SecurityProtocol != "insecure" {
+		t.Errorf("expected security protocol 'insecure', got %q", info.SecurityProtocol)
 	}
+}
+
+func TestBuildRejectsOAuth2WithInsecureChannel(t *testing.T) {
+	creds := auth.NewOAuth2ClientCredentials("test-id", "test-secret", "https://issuer.example.com")
+	b := NewClientBuilder("localhost:8080", noopStub).
+		OAuth2ClientAuthenticated(&creds, insecure.NewCredentials())
+
+	_, _, err := b.Build()
+	if err == nil {
+		t.Fatal("expected error when combining OAuth2 credentials with insecure channel")
+	}
+	if !strings.Contains(err.Error(), "can not authenticate with insecure channel") {
+		t.Errorf("unexpected error message: %v", err)
+	}
+}
+
+func TestBuildRejectsAuthenticatedWithSecureCredsOnInsecureChannel(t *testing.T) {
+	// The exported kesselgrpc.OAuth2CallCredentials always requires transport security.
+	// Simulate that with oauth2PerRPCCreds (also always requires transport security).
+	b := NewClientBuilder("localhost:8080", noopStub).
+		Authenticated(&oauth2PerRPCCreds{}, insecure.NewCredentials())
+
+	_, _, err := b.Build()
+	if err == nil {
+		t.Fatal("expected error when combining secure per-RPC credentials with insecure channel")
+	}
+	if !strings.Contains(err.Error(), "can not authenticate with insecure channel") {
+		t.Errorf("unexpected error message: %v", err)
+	}
+}
+
+func TestBuildAllowsCustomCredsNotRequiringTransportSecurityOnInsecureChannel(t *testing.T) {
+	b := NewClientBuilder("localhost:8080", noopStub).
+		Authenticated(insecurePerRPCCreds{}, insecure.NewCredentials())
+
+	_, conn, err := b.Build()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer func() {
+		if closeErr := conn.Close(); closeErr != nil {
+			t.Errorf("failed to close gRPC connection: %v", closeErr)
+		}
+	}()
+}
+
+func TestBuildAllowsInsecureWithNoCreds(t *testing.T) {
+	b := NewClientBuilder("localhost:8080", noopStub).
+		Insecure()
+
+	_, conn, err := b.Build()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer func() {
+		if closeErr := conn.Close(); closeErr != nil {
+			t.Errorf("failed to close gRPC connection: %v", closeErr)
+		}
+	}()
+}
+
+func TestBuildAllowsOAuth2WithTLS(t *testing.T) {
+	creds := auth.NewOAuth2ClientCredentials("test-id", "test-secret", "https://issuer.example.com")
+	b := NewClientBuilder("localhost:8080", noopStub).
+		OAuth2ClientAuthenticated(&creds, nil)
+
+	_, conn, err := b.Build()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	defer func() {
+		if closeErr := conn.Close(); closeErr != nil {
+			t.Errorf("failed to close gRPC connection: %v", closeErr)
+		}
+	}()
 }

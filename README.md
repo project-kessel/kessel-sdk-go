@@ -95,6 +95,8 @@ See the [examples](#examples) section for complete working code.
 
 Pass `nil` for `tlsCreds` to use the default TLS configuration.
 
+> **Insecure channels suppress authentication.** `Build()` returns an error if per-RPC credentials that require transport security are combined with an insecure channel. Use `.Insecure()` for plaintext without auth. When migrating to TLS, flip `KESSEL_INSECURE=false` -- no code change needed, and authentication activates automatically.
+
 ### gRPC keepalive
 
 Every client built with `ClientBuilder.Build()` uses a **45-second keepalive interval**, a **10-second acknowledgment timeout**, and permits keepalive pings when no RPC is active. No keepalive call is needed for these defaults. The `v1beta2` builder exposes typed functional options for overrides; each option changes only its specified value, so omitted values retain their current setting and an explicit `false` is honored:
