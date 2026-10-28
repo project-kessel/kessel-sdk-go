@@ -59,7 +59,7 @@ CI runs `make lint` and `make test` (via separate workflows) on every push/PR to
 
 ## Go Version and Module Path
 
-- **Go 1.25** (specified in `go.mod`; CI reads from `go.mod` via `go-version-file`)
+- **Go 1.26.10** (specified in `go.mod`; CI reads from `go.mod` via `go-version-file`)
 - Module path: `github.com/project-kessel/kessel-sdk-go`
 - The codebase uses generics (supported since Go 1.18) and Go 1.23+ features: `iter.Seq2`, range-over-func
 
@@ -217,13 +217,15 @@ When public API surface is added or changed (new exported functions, new builder
 
 6. **Mixing the two OAuth2 gRPC adapters.** `kesselgrpc.OAuth2CallCredentials` (exported, always requires TLS) is for use with `.Authenticated()`. The internal `oauth2PerRPCCreds` is used automatically by `.OAuth2ClientAuthenticated()`. Don't use both. See [builder GUIDELINES.md](kessel/inventory/internal/builder/GUIDELINES.md).
 
-7. **Forgetting `defer conn.Close()` after `Build()`.** The caller owns the connection. Leaking it leaks the underlying HTTP/2 transport.
+7. **Combining OAuth2 credentials with insecure transport.** `Build()` rejects per-RPC credentials that require transport security on an insecure channel: `invalid credential configuration: can not authenticate with insecure channel`. Use `.Insecure()` for plaintext without auth. Do not pass `insecure.NewCredentials()` as `channelCredentials` to `OAuth2ClientAuthenticated` or `Authenticated`.
 
-8. **Using `_test` package suffix in test files.** All tests in this repo use white-box testing (same package name). This gives access to unexported types and is the established convention.
+8. **Forgetting `defer conn.Close()` after `Build()`.** The caller owns the connection. Leaking it leaks the underlying HTTP/2 transport.
 
-9. **Introducing mockgen or gomock.** All mocks are hand-written in `_test.go` files. Do not add mock generation tools.
+9. **Using `_test` package suffix in test files.** All tests in this repo use white-box testing (same package name). This gives access to unexported types and is the established convention.
 
-10. **Using `require` from testify in `kessel/auth`, `kessel/config`, or `kessel/grpc`.** Those packages use stdlib testing only. Only `kessel/rbac/v2` uses testify.
+10. **Introducing mockgen or gomock.** All mocks are hand-written in `_test.go` files. Do not add mock generation tools.
+
+11. **Using `require` from testify in `kessel/auth`, `kessel/config`, or `kessel/grpc`.** Those packages use stdlib testing only. Only `kessel/rbac/v2` uses testify.
 
 ## PR and CI Expectations
 

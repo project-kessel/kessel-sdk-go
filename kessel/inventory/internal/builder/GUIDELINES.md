@@ -27,11 +27,21 @@ Each mode is a single method that fully configures both transport and per-RPC cr
 | `Authenticated(perRPC, tlsCreds)` | TLS | Caller-provided | Use with `kesselgrpc.OAuth2CallCredentials`. |
 | `OAuth2ClientAuthenticated(creds, tlsCreds)` | TLS | Internal adapter | Wraps `*auth.OAuth2ClientCredentials` automatically. |
 
-For the three TLS modes, passing `nil` as `channelCredentials` falls back to `credentials.NewTLS(&tls.Config{MinVersion: tls.VersionTLS12})` (system CA pool, TLS 1.2 minimum). Do not pass `insecure.NewCredentials()` as the channel creds argument -- use `Insecure()` instead.
+For the three TLS modes, passing `nil` as `channelCredentials` falls back to `credentials.NewTLS(&tls.Config{MinVersion: tls.VersionTLS12})` (system CA pool, TLS 1.2 minimum). Do not pass `insecure.NewCredentials()` as the channel creds argument -- use `Insecure()` instead. `Build()` rejects the combination at build time (see below).
+
+### Insecure + Auth Credential Guard
+
+`Build()` returns an error when the resolved channel credentials are insecure and the per-RPC credentials require transport security (`RequireTransportSecurity() == true`). The error message matches the other Kessel SDKs:
+
+```
+invalid credential configuration: can not authenticate with insecure channel
+```
+
+This catches misuse like `OAuth2ClientAuthenticated(creds, insecure.NewCredentials())` before any connection is made. Custom `PerRPCCredentials` whose `RequireTransportSecurity()` returns `false` are still allowed on insecure channels (preserves the `WithInsecureBearerToken`-style escape hatch).
 
 ## Internal oauth2PerRPCCreds Adapter
 
-This unexported type bridges `*auth.OAuth2ClientCredentials` to `credentials.PerRPCCredentials`. It differs from the exported `kesselgrpc.OAuth2CallCredentials` in one way: `RequireTransportSecurity()` returns `!o.insecure`, allowing it to work with `Insecure()` mode. The exported adapter always returns `true`.
+This unexported type bridges `*auth.OAuth2ClientCredentials` to `credentials.PerRPCCredentials`. Like the exported `kesselgrpc.OAuth2CallCredentials`, `RequireTransportSecurity()` always returns `true` -- OAuth2 tokens must not be sent over plaintext. The `Build()` guard rejects insecure channels before a connection is made.
 
 Do not use both adapters for the same client. `.OAuth2ClientAuthenticated()` uses the internal one; `.Authenticated()` expects the caller to use `kesselgrpc.OAuth2CallCredentials` or a custom implementation.
 
@@ -58,8 +68,8 @@ Credentials are attached via `grpc.WithDefaultCallOptions(grpc.PerRPCCredentials
 ## setChannelCredentialsOrDefault
 
 This private helper is called by `OAuth2ClientAuthenticated`, `Authenticated`, and `Unauthenticated`. It:
-1. Sets `b.insecure = false`
-2. Uses the provided `channelCredentials` if non-nil, otherwise falls back to default TLS
+1. Uses the provided `channelCredentials` if non-nil, otherwise falls back to default TLS
+2. Detects insecure transport via `channelCredentials.Info().SecurityProtocol == "insecure"` and sets `b.insecure` accordingly
 
 `Insecure()` bypasses this helper entirely and sets its own state. The ordering matters: calling `Insecure()` then `OAuth2ClientAuthenticated()` results in TLS mode (last writer wins).
 

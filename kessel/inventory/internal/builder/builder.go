@@ -41,11 +41,12 @@ func NewClientBuilder[C any](target string, newStub func(grpc.ClientConnInterfac
 }
 
 func (b *ClientBuilder[C]) setChannelCredentialsOrDefault(channelCredentials credentials.TransportCredentials) {
-	b.insecure = false
 	if channelCredentials != nil {
 		b.channelCredentials = channelCredentials
+		b.insecure = channelCredentials.Info().SecurityProtocol == "insecure"
 	} else {
 		b.channelCredentials = credentials.NewTLS(defaultTLSConfig())
+		b.insecure = false
 	}
 }
 
@@ -53,7 +54,7 @@ func (b *ClientBuilder[C]) OAuth2ClientAuthenticated(oAuth2ClientCredentials *au
 	b.perRPCCredentials = nil
 	b.setChannelCredentialsOrDefault(channelCredentials)
 	if oAuth2ClientCredentials != nil {
-		b.perRPCCredentials = &oauth2PerRPCCreds{creds: oAuth2ClientCredentials, insecure: b.insecure}
+		b.perRPCCredentials = &oauth2PerRPCCreds{creds: oAuth2ClientCredentials}
 	}
 	return b
 }
@@ -85,6 +86,9 @@ func (b *ClientBuilder[C]) Build() (C, *grpc.ClientConn, error) {
 	if err := b.keepalive.validate(); err != nil {
 		return zero, nil, err
 	}
+	if b.insecure && b.perRPCCredentials != nil && b.perRPCCredentials.RequireTransportSecurity() {
+		return zero, nil, fmt.Errorf("invalid credential configuration: can not authenticate with insecure channel")
+	}
 
 	var dialOpts []grpc.DialOption
 	// Transport security (TLS or insecure)
@@ -103,8 +107,7 @@ func (b *ClientBuilder[C]) Build() (C, *grpc.ClientConn, error) {
 }
 
 type oauth2PerRPCCreds struct {
-	creds    *auth.OAuth2ClientCredentials
-	insecure bool
+	creds *auth.OAuth2ClientCredentials
 }
 
 func (o *oauth2PerRPCCreds) GetRequestMetadata(ctx context.Context, uri ...string) (map[string]string, error) {
@@ -118,5 +121,5 @@ func (o *oauth2PerRPCCreds) GetRequestMetadata(ctx context.Context, uri ...strin
 }
 
 func (o *oauth2PerRPCCreds) RequireTransportSecurity() bool {
-	return !o.insecure
+	return true
 }
