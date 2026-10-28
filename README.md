@@ -95,7 +95,7 @@ See the [examples](#examples) section for complete working code.
 
 Pass `nil` for `tlsCreds` to use the default TLS configuration.
 
-> **Insecure channels suppress authentication.** `Build()` returns an error if per-RPC credentials that require transport security are combined with an insecure channel. Use `.Insecure()` for plaintext without auth. When migrating to TLS, flip `KESSEL_INSECURE=false` -- no code change needed, and authentication activates automatically.
+> **`.Insecure()` suppresses authentication.** `Build()` returns an error if per-RPC credentials that require transport security are combined with an insecure channel. Custom per-RPC credentials whose `RequireTransportSecurity()` returns `false` remain attached on an insecure channel, and their metadata can be sent in plaintext. Use `.Insecure()` for plaintext without auth. When migrating to TLS, switch to an authenticated builder mode (`.Authenticated()` or `.OAuth2ClientAuthenticated()`) in your application code.
 
 ### gRPC keepalive
 
