@@ -482,6 +482,87 @@ func TestOAuth2ClientCredentials_refreshToken(t *testing.T) {
 	}
 }
 
+func TestOAuth2ClientCredentials_refreshToken_UsesActualExpiry(t *testing.T) {
+	tests := []struct {
+		name             string
+		expiresIn        int
+		includeExpiresIn bool
+		expectedLifetime time.Duration
+		expectedValid    bool
+	}{
+		{
+			name:             "uses 900 second expiry",
+			expiresIn:        900,
+			includeExpiresIn: true,
+			expectedLifetime: 900 * time.Second,
+			expectedValid:    true,
+		},
+		{
+			name:             "short 120 second expiry refreshes immediately",
+			expiresIn:        120,
+			includeExpiresIn: true,
+			expectedLifetime: 120 * time.Second,
+			expectedValid:    false,
+		},
+		{
+			name:             "uses 3600 second expiry",
+			expiresIn:        3600,
+			includeExpiresIn: true,
+			expectedLifetime: 3600 * time.Second,
+			expectedValid:    true,
+		},
+		{
+			name:             "defaults when expires_in is zero",
+			expiresIn:        0,
+			includeExpiresIn: true,
+			expectedLifetime: defaultExpiresIn * time.Second,
+			expectedValid:    true,
+		},
+		{
+			name:             "defaults when expires_in is missing",
+			expectedLifetime: defaultExpiresIn * time.Second,
+			expectedValid:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				response := map[string]interface{}{
+					"access_token": "test-token",
+					"token_type":   "Bearer",
+				}
+				if tt.includeExpiresIn {
+					response["expires_in"] = tt.expiresIn
+				}
+				w.Header().Set("Content-Type", "application/json")
+				if err := json.NewEncoder(w).Encode(response); err != nil {
+					t.Errorf("Failed to encode test response: %v", err)
+				}
+			}))
+			defer server.Close()
+
+			credentials := NewOAuth2ClientCredentials("test-client", "test-secret", server.URL, WithMaxRetries(0))
+
+			start := time.Now()
+			result, err := credentials.refreshToken(context.Background(), http.DefaultClient)
+			if err != nil {
+				t.Fatalf("Unexpected error: %v", err)
+			}
+
+			lifetime := result.ExpiresAt.Sub(start)
+			if lifetime < tt.expectedLifetime-2*time.Second || lifetime > tt.expectedLifetime+2*time.Second {
+				t.Errorf("Expected token lifetime %s, got %s", tt.expectedLifetime, lifetime)
+			}
+
+			credentials.cachedToken = result
+			if valid := credentials.isTokenValid(); valid != tt.expectedValid {
+				t.Errorf("Expected token valid to be %v, got %v", tt.expectedValid, valid)
+			}
+		})
+	}
+}
+
 func TestOauth2TokenEndpointCaller(t *testing.T) {
 	tokenEndpoint := "https://example.com/token"
 	httpClient := &http.Client{}
